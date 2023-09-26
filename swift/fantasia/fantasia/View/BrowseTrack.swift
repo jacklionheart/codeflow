@@ -11,6 +11,7 @@ import AVFoundation
 
 struct BrowseTrack: View {
     @EnvironmentObject var session: Session
+    @EnvironmentObject var audioMixer: AudioMixer
     @ObservedRealmObject var track: Track
     @Binding var selected: Track?
 
@@ -32,11 +33,11 @@ struct BrowseTrack: View {
                 select()
             }
             Spacer()
-            PlayButton(isPlaying: session.audioMixer.isPlaying(track), start: {
+            PlayButton(isPlaying: audioMixer.isPlaying(track), start: {
                 print("playing")
-                session.audioMixer.play(track)
+                audioMixer.play(track)
             }, stop: {
-                session.audioMixer.stop(track)
+                audioMixer.stop(track)
             })
         }
         

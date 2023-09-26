@@ -10,8 +10,10 @@ import RealmSwift
 
 struct Fantasia: View {
     @EnvironmentObject var session: Session
+    @EnvironmentObject var audioMixer: AudioMixer
+
     @ObservedResults(Track.self) var tracks
-    
+
     @State var selected: Track?
 
     

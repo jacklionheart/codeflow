@@ -10,7 +10,7 @@ import AVFoundation
 
 class AudioMixer: ObservableObject {
     var audioEngine: AVAudioEngine
-    var playerNodes: [UInt64: AVAudioPlayerNode]
+    @Published var playerNodes: [UInt64: AVAudioPlayerNode]
   
     init() {
         audioEngine = AVAudioEngine()
@@ -53,16 +53,18 @@ class AudioMixer: ObservableObject {
 
     public func play(_ track : Track) {
         self.stop(track)
-        
+        let tid = track.id
+
         let playerNode = AVAudioPlayerNode()
         audioEngine.attach(playerNode)
-        print("adding player")
-        playerNodes[track.id] = playerNode
+        print("adding player for \(tid)")
+        playerNodes[tid] = playerNode
         let audioFile = try! AVAudioFile(forReading: URL(string: track.sourceURL)!)
         audioEngine.connect(playerNode,
                             to: audioEngine.mainMixerNode,
                             format: audioFile.processingFormat)
         self.schedule(playerNode, from: audioFile)
+        playerNode.play()
     }
     
     private func schedule(_ playerNode : AVAudioPlayerNode, from audioFile : AVAudioFile) {
@@ -76,15 +78,17 @@ class AudioMixer: ObservableObject {
             playerNode.stop()
             audioEngine.disconnectNodeInput(playerNode)
             audioEngine.detach(playerNode)
+            playerNodes[track.id] = nil
         }
     }
     
     public func isPlaying(_ track: Track) -> Bool {
-        if let _ = playerNodes[track.id] {
-            print("found track")
+        let tid = track.id
+        if let _ = playerNodes[tid] {
+            print("found track \(tid)")
             return true
         } else {
-            print("lost track")
+            print("no track for \(tid)")
             return false
         }
     }

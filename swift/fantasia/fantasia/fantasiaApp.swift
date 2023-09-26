@@ -10,10 +10,11 @@ import SwiftUI
 @main
 struct fantasiaApp: App {
     var session = Session()
+    var audioMixer = AudioMixer()
 
     var body: some Scene {
         WindowGroup {
-            Fantasia().environmentObject(session)
+            Fantasia().environmentObject(session).environmentObject(audioMixer)
         }
     }
 }
