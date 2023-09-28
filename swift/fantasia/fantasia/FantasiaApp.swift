@@ -1,5 +1,5 @@
 //
-//  fantasiaApp.swift
+//  FantasiaApp.swift
 //  fantasia
 //
 //  Created by Jack Heart on 11/18/22.
@@ -8,8 +8,8 @@
 import SwiftUI
 
 @main
-struct fantasiaApp: App {
-    var session = Session()
+struct FantasiaApp: App {
+    var session = RealmSession()
     var audioMixer = AudioMixer()
 
     var body: some Scene {

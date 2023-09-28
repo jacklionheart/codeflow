@@ -7,6 +7,7 @@
 
 import Foundation
 import RealmSwift
+import AVFoundation
 
 class Track: Object, ObjectKeyIdentifiable {
     
@@ -23,7 +24,11 @@ class Track: Object, ObjectKeyIdentifiable {
     @Persisted(primaryKey: true) var _id: ObjectId
     @Persisted var name = Object.randomName()
     @Persisted var creationDate = Date()
+    // Start time into the source, in seconds.
+    @Persisted var startSeconds = 0.0
+    // Duration past start-time to play, in seconds.
     @Persisted var durationSeconds = 0.0
+
     @Persisted var sourceURL = ""
     @Persisted var subtracks = RealmSwift.List<Track>()
     @Persisted var parent: Track?
@@ -36,6 +41,10 @@ class Track: Object, ObjectKeyIdentifiable {
     convenience init(sourceURL: String) {
         self.init()
         self.sourceURL = sourceURL
+        print("Creating Track: \(name)")
+        print("URL: \(sourceURL)")
+        durationSeconds = audioFile().duration
+        print("Duration (s) \(durationSeconds)")
     }
     
     // MARK: Audio-facing API
@@ -79,13 +88,16 @@ class Track: Object, ObjectKeyIdentifiable {
         subtracks.append(subtrack)
         subtrack.parent = self
         denormalize()
-        
+
     }
     
     public func resetMix() {
         volume = 1.0
     }
     
+    public func audioFile() -> AVAudioFile {
+        return try! AVAudioFile(forReading: URL(string: sourceURL)!)
+    }
         
     // MARK: Private Manipulation
  

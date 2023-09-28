@@ -17,11 +17,10 @@ class AudioMixer: ObservableObject {
     
     /// Plays a track. Stop all other tracks. Restarts the track from beginning if already playing.
     public func play(_ track : Track) {
-        let audioFile = try! AVAudioFile(forReading: URL(string: track.sourceURL)!)
         let playerNode = playerNode(track)
         
         stopAllTracks()
-        self.loop(playerNode, from: audioFile)
+        self.loop(playerNode, from: track)
         playerNode.play()
         activePlayerNodes[track.id] = playerNode
     }
@@ -89,13 +88,31 @@ class AudioMixer: ObservableObject {
     }
     
     /// Loops a track by scheduling it to
-    private func loop(_ playerNode : AVAudioPlayerNode, from audioFile : AVAudioFile) {
-        playerNode.scheduleFile(audioFile, at: nil) {
-            self.loop(playerNode, from: audioFile)
+    private func loop(_ playerNode : AVAudioPlayerNode, from track : Track) {
+        let audioFile = track.audioFile()
+        let sampleRate = audioFile.processingFormat.sampleRate
+        let startSample = AVAudioFramePosition(track.startSeconds * sampleRate)
+        let endSample = AVAudioFramePosition((track.startSeconds + track.durationSeconds) * sampleRate)
+        let frameCount = AVAudioFrameCount(endSample - startSample)
+        let trackURL = track.sourceURL
+        let trackName = track.name
+
+        print("""
+               --- Playing track ---
+               Track name: \(trackName)
+               Track location: \(trackURL)
+               Sample Rate: \(sampleRate)
+               Start Sample: \(startSample)
+               End Sample: \(endSample)
+               Frame Count: \(frameCount)
+               -------------------------------
+               """)
+        
+        playerNode.scheduleSegment(audioFile, startingFrame: startSample, frameCount: frameCount, at: nil) {
+            self.loop(playerNode, from: track)
         }
     }
     private func playerNode(_ track : Track) -> AVAudioPlayerNode {
-        let audioFile = try! AVAudioFile(forReading: URL(string: track.sourceURL)!)
         let tid = track.id
         if playerNodes[tid] == nil {
             let playerNode = AVAudioPlayerNode()
@@ -104,7 +121,7 @@ class AudioMixer: ObservableObject {
             playerNodes[tid] = playerNode
             audioEngine.connect(playerNode,
                                 to: audioEngine.mainMixerNode,
-                                format: audioFile.processingFormat)
+                                format: track.audioFile().processingFormat)
         }
         return playerNodes[tid]!
     }

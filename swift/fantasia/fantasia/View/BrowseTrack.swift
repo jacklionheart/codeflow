@@ -10,7 +10,7 @@ import RealmSwift
 import AVFoundation
 
 struct BrowseTrack: View {
-    @EnvironmentObject var session: Session
+    @EnvironmentObject var session: RealmSession
     @EnvironmentObject var audioMixer: AudioMixer
     @ObservedRealmObject var track: Track
     @Binding var selected: Track?
@@ -28,20 +28,24 @@ struct BrowseTrack: View {
     
     
     var body: some View {
-        HStack {
-            Text(track.name).onTapGesture {
-                select()
+        VStack {
+            HStack {
+                Text(track.name).onTapGesture {
+                    select()
+                }
+                Spacer()
+                PlayButton(isPlaying: audioMixer.isPlaying(track), start: {
+                    print("playing")
+                    audioMixer.play(track)
+                    select()
+                }, stop: {
+                    audioMixer.stop(track)
+                })
             }
-            Spacer()
-            PlayButton(isPlaying: audioMixer.isPlaying(track), start: {
-                print("playing")
-                audioMixer.play(track)
-                select()
-            }, stop: {
-                audioMixer.stop(track)
-            })
+            if isSelected() {
+                TrackWaveform(track:track)
+            }
         }
-        
     }
     
     

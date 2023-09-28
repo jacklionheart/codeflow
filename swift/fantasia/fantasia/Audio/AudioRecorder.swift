@@ -55,6 +55,9 @@ class AudioRecorder : ObservableObject {
     func stopAndSave(to: Track?) {
         print("stop")
         if isRecording {
+            avAudioRecorder!.stop()
+            avAudioRecorder = nil
+            
             transaction {
                 // TODO: Get realm from session?
                 let realm = try! Realm()
@@ -65,8 +68,6 @@ class AudioRecorder : ObservableObject {
                 }
             }
             
-            avAudioRecorder!.stop()
-            avAudioRecorder = nil
             currentRecordingPath = nil
         }
     }

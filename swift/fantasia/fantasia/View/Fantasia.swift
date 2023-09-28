@@ -9,7 +9,7 @@ import SwiftUI
 import RealmSwift
 
 struct Fantasia: View {
-    @EnvironmentObject var session: Session
+    @EnvironmentObject var session: RealmSession
     @EnvironmentObject var audioMixer: AudioMixer
 
     @ObservedResults(Track.self) var tracks
@@ -28,7 +28,7 @@ struct Fantasia: View {
         VStack{
             List {
                 ForEach(tracks) { track in
-                    BrowseTrack(track: track, selected: $selected).background(isSelected(track) ? Color.red : Color.green)
+                    BrowseTrack(track: track, selected: $selected)
                 }
             }
             RecordTrack()
