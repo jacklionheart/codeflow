@@ -1,5 +1,5 @@
 //
-//  ViewState.swift
+//  RealmSession.swift
 //  fantasia
 //
 //  Created by Jack Heart on 5/8/23.
@@ -10,7 +10,7 @@ import RealmSwift
 import AVFoundation
 
 // Our observable object class
-class Session: ObservableObject {
+class RealmSession: ObservableObject {
     var realm: Realm
     
     init() {

@@ -36,6 +36,7 @@ struct BrowseTrack: View {
             PlayButton(isPlaying: audioMixer.isPlaying(track), start: {
                 print("playing")
                 audioMixer.play(track)
+                select()
             }, stop: {
                 audioMixer.stop(track)
             })
