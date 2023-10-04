@@ -1,13 +1,13 @@
 //
-//  fantasiaUITestsLaunchTests.swift
-//  fantasiaUITests
+//  loopflowUITestsLaunchTests.swift
+//  loopflowUITests
 //
-//  Created by Jack Heart on 11/18/22.
+//  Created by Jack Heart on 10/2/23.
 //
 
 import XCTest
 
-final class fantasiaUITestsLaunchTests: XCTestCase {
+final class loopflowUITestsLaunchTests: XCTestCase {
 
     override class var runsForEachTargetApplicationUIConfiguration: Bool {
         true

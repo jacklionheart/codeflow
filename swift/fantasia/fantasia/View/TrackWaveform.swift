@@ -1,6 +1,6 @@
 //
 //  Waveform.swift
-//  fantasia
+//  loopflow
 //
 //  Created by Jack Heart on 9/28/23.
 //
@@ -8,25 +8,23 @@
 import SwiftUI
 import RealmSwift
 import AudioKit
+import Waveform
 
 struct TrackWaveform: View {
     
     @ObservedRealmObject var track: Track
     
-    func audioSamples() -> [Float] {
-        let pcmBuffer = track.audioFile().toAVAudioPCMBuffer()!
-        
-        let channelData = pcmBuffer.floatChannelData?.pointee
-        let channelDataCount = Int(pcmBuffer.frameLength)
-        return Array(UnsafeBufferPointer(start: channelData, count: channelDataCount))
+    func audioSamples() -> SampleBuffer {
+        // only looking at left channel for now ?
+        return SampleBuffer(samples: track.audioFile().floatChannelData()![0])
     }
     
     var body: some View {
-        WaveformView(samples:audioSamples())
+        Waveform(samples: audioSamples()).foregroundColor(.blue)
     }
 }
 
-struct WaveformView: View {
+struct TimeBounds: View {
     var samples: [Float] = []
     
     // Start and stop positions as ratios (0.0 to 1.0)
@@ -91,16 +89,10 @@ struct WaveformView: View {
     }
 }
 
-struct WaveformView_Previews: PreviewProvider {
+struct TrackWaveform_Previews: PreviewProvider {
     static var previews: some View {
         WaveformView(samples: Array(repeating: 0.5, count: 100))
             .frame(height: 200)
             .padding()
     }
 }
-//
-//struct TrackWaveform_Previews: PreviewProvider {
-//    static var previews: some View {
-//        TrackWaveform()
-//    }
-//}

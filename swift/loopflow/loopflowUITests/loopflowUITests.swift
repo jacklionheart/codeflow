@@ -1,13 +1,13 @@
 //
-//  fantasiaUITests.swift
-//  fantasiaUITests
+//  loopflowUITests.swift
+//  loopflowUITests
 //
-//  Created by Jack Heart on 11/18/22.
+//  Created by Jack Heart on 10/2/23.
 //
 
 import XCTest
 
-final class fantasiaUITests: XCTestCase {
+final class loopflowUITests: XCTestCase {
 
     override func setUpWithError() throws {
         // Put setup code here. This method is called before the invocation of each test method in the class.

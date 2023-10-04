@@ -1,14 +1,14 @@
 //
-//  fantasiaTests.swift
-//  fantasiaTests
+//  loopflowTests.swift
+//  loopflowTests
 //
-//  Created by Jack Heart on 11/18/22.
+//  Created by Jack Heart on 10/2/23.
 //
 
 import XCTest
-@testable import fantasia
+@testable import loopflow
 
-final class fantasiaTests: XCTestCase {
+final class loopflowTests: XCTestCase {
 
     override func setUpWithError() throws {
         // Put setup code here. This method is called before the invocation of each test method in the class.

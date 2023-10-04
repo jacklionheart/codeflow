@@ -1,14 +1,7 @@
-//
-//  HomeView.swift
-//  fantasia
-//
-//  Created by Jack Heart on 11/18/22.
-//
-
 import SwiftUI
 import RealmSwift
 
-struct Fantasia: View {
+struct Loopflow: View {
     @EnvironmentObject var session: RealmSession
     @EnvironmentObject var audioMixer: AudioMixer
 
