@@ -2,16 +2,19 @@
 //  loopflowApp.swift
 //  loopflow
 //
-//  Created by Jack Heart on 10/2/23.
+//  Created by Jack Heart on 11/18/22.
 //
 
 import SwiftUI
 
 @main
-struct loopflowApp: App {
+struct LoopflowApp: App {
+    var session = RealmSession()
+    var audioMixer = AudioMixer()
+
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            Loopflow().environmentObject(session).environmentObject(audioMixer)
         }
     }
 }
