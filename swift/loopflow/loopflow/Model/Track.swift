@@ -28,7 +28,7 @@ class Track: Object, ObjectKeyIdentifiable {
     @Persisted var startSeconds = 0.0
     // Duration past start-time to play, in seconds.
     @Persisted var durationSeconds = 0.0
-
+    @Persisted<Int> var semitoneShift = 0
     @Persisted var sourceURL = ""
     @Persisted var subtracks = RealmSwift.List<Track>()
     @Persisted var parent: Track?
@@ -41,10 +41,10 @@ class Track: Object, ObjectKeyIdentifiable {
     convenience init(sourceURL: String) {
         self.init()
         self.sourceURL = sourceURL
-        print("Creating Track: \(name)")
-        print("URL: \(sourceURL)")
         durationSeconds = audioFile().duration
         print("Duration (s) \(durationSeconds)")
+        print("Creating Track: \(name)")
+        print("URL: \(sourceURL)")
     }
     
     // MARK: Audio-facing API
@@ -96,6 +96,7 @@ class Track: Object, ObjectKeyIdentifiable {
     }
     
     public func audioFile() -> AVAudioFile {
+        print("Reading audio file from URL: \(sourceURL)")
         return try! AVAudioFile(forReading: URL(string: sourceURL)!)
     }
         
@@ -110,6 +111,7 @@ class Track: Object, ObjectKeyIdentifiable {
         newTrack.sourceURL = sourceURL
         newTrack.durationSeconds = durationSeconds
         newTrack.volume = volume
+        newTrack.semitoneShift = semitoneShift
         // parent is not copied
         
         newTrack.denormalize()

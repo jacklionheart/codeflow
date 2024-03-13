@@ -1,10 +1,3 @@
-//
-//  Creator.swift
-//  loopflow
-//
-//  Created by Jack Heart on 4/19/23.
-//
-
 import Foundation
 import RealmSwift
 

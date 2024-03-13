@@ -1,14 +1,6 @@
-//
-//  AudioRecorder.swift
-//  loopflow
-//
-//  Created by Jack Heart on 2/13/23.
-//
-
 import Foundation
 import RealmSwift
 import AVFoundation
-
 
 class AudioRecorder : ObservableObject {
         
@@ -24,8 +16,11 @@ class AudioRecorder : ObservableObject {
         FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
     }
     
+    
     private static func newUrl(for date: Date) -> URL {
-        return AudioRecorder.fileDirectory().appending(path:"Loopflow Recording \(date.formatted(date: .complete, time: .complete)).m4a")
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyyMMdd_HHmmss"
+        return AudioRecorder.fileDirectory().appendingPathComponent("Loopflow_Recording_\(dateFormatter.string(from: date)).m4a")
     }
     
     var isRecording: Bool {
@@ -33,6 +28,21 @@ class AudioRecorder : ObservableObject {
     }
     
     func start() {
+        do {
+            let audioSession = AVAudioSession.sharedInstance()
+            try audioSession.setCategory(.playAndRecord, mode: .default)
+            try audioSession.setActive(true)
+        } catch {
+            print("Failed to set up audio session: \(error.localizedDescription)")
+        }
+        
+        let settings = [
+            AVFormatIDKey: Int(kAudioFormatMPEG4AAC),
+            AVSampleRateKey: 44100,
+            AVNumberOfChannelsKey: 1,
+            AVEncoderAudioQualityKey: AVAudioQuality.high.rawValue
+        ]
+        
         print("start")
         print(isRecording)
         if !isRecording {
@@ -40,12 +50,12 @@ class AudioRecorder : ObservableObject {
                 print("do")
                 let date = Date()
                 currentRecordingPath = AudioRecorder.newUrl(for: date)
-                avAudioRecorder = try AVAudioRecorder.init(url: currentRecordingPath!, settings: [:])
+                avAudioRecorder = try AVAudioRecorder.init(url: currentRecordingPath!, settings: settings)
                 avAudioRecorder!.record()
-                print("recording")
+                print("recording to \(currentRecordingPath!.absoluteString)")
                 print(isRecording)
-            } catch {
-                print("catch")
+            } catch let error {
+                print("Error starting recorder: \(error.localizedDescription)")
                 avAudioRecorder = nil
                 currentRecordingPath = nil
             }
@@ -58,7 +68,7 @@ class AudioRecorder : ObservableObject {
             avAudioRecorder!.stop()
             avAudioRecorder = nil
             
-            transaction {
+            writeToRealm {
                 // TODO: Get realm from session?
                 let realm = try! Realm()
                 let newTrack = Track(sourceURL: currentRecordingPath!.absoluteString)

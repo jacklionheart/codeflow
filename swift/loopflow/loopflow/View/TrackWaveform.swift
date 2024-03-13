@@ -1,10 +1,3 @@
-//
-//  Waveform.swift
-//  loopflow
-//
-//  Created by Jack Heart on 9/28/23.
-//
-
 import SwiftUI
 import RealmSwift
 import AudioKit
@@ -89,10 +82,3 @@ struct TimeBounds: View {
     }
 }
 
-struct TrackWaveform_Previews: PreviewProvider {
-    static var previews: some View {
-        WaveformView(samples: Array(repeating: 0.5, count: 100))
-            .frame(height: 200)
-            .padding()
-    }
-}

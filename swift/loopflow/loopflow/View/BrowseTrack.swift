@@ -1,10 +1,3 @@
-//
-//  ListTrackView.swift
-//  loopflow
-//
-//  Created by Jack Heart on 4/19/23.
-//
-
 import SwiftUI
 import RealmSwift
 import AVFoundation
@@ -25,14 +18,23 @@ struct BrowseTrack: View {
     func select() {
         selected = track
     }
-    
+    func shiftPitch(up: Bool) {
+        let shiftAmount = up ? 1 : -1
+        
+        let newShift = track.semitoneShift + shiftAmount
+        audioMixer.shiftPitch(of: track, by: track.semitoneShift)
+        
+        writeToRealm {
+            track.semitoneShift.wrappedValue = newShift
+        }
+    }
     
     var body: some View {
         VStack {
             HStack {
-                Text(track.name).onTapGesture {
-                    select()
-                }
+//                Text(track.name).onTapGesture {
+//                    select()
+//                }
                 Spacer()
                 PlayButton(isPlaying: audioMixer.isPlaying(track), start: {
                     print("playing")
@@ -41,10 +43,29 @@ struct BrowseTrack: View {
                 }, stop: {
                     audioMixer.stop(track)
                 })
-            }
-            if isSelected() {
-                TrackWaveform(track:track)
-            }
+                Spacer()
+
+                // Display current semitone shift
+                Text("\(track.semitoneShift, specifier: "%+.1f") semitones")
+                    .foregroundColor(.gray)
+                    .font(.system(size: 14))
+                // Pitch Shift Buttons
+                Group {
+                    Image(systemName: "minus")
+                        .font(.system(size: 20))
+                        .foregroundColor(.blue)
+                        .padding([.leading, .trailing], 10)
+                        .onTapGesture { shiftPitch(up: false) }
+                    Image(systemName: "plus")
+                        .font(.system(size: 20))
+                        .foregroundColor(.blue)
+                        .padding([.leading, .trailing], 10)
+                        .onTapGesture { shiftPitch(up: true) }
+                }
+            }.padding(.leading, 10)
+        }
+        if isSelected() {
+            TrackWaveform(track:track)
         }
     }
     

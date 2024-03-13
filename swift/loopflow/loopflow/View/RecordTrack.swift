@@ -1,12 +1,4 @@
-//
-//  RecorderView.swift
-//  loopflow
-//
-//  Created by Jack Heart on 11/23/22.
-//
-
 import SwiftUI
-import RealmSwift
 
 struct RecordTrack: View {
     @StateObject var audioRecorder = AudioRecorder()

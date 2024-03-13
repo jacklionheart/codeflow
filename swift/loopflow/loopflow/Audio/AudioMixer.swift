@@ -1,58 +1,62 @@
-//
-//  AudioMixer.swift
-//  loopflow
-//
-//  Created by Jack Heart on 9/24/23.
-//
-
 import Foundation
 import AVFoundation
 
 class AudioMixer: ObservableObject {
+    
     var audioEngine: AVAudioEngine
-    @Published var playerNodes: [UInt64: AVAudioPlayerNode]
-    @Published var activePlayerNodes: [UInt64: AVAudioPlayerNode]
+    @Published var audioNodes: [UInt64: AudioNode]
+    @Published var activeAudioNodes: [UInt64: AudioNode]
     
     // MARK: - Public Methods
     
     /// Plays a track. Stop all other tracks. Restarts the track from beginning if already playing.
     public func play(_ track : Track) {
-        let playerNode = playerNode(track)
+        let audioNode = audioNode(track)
+        let playerNode = audioNode.playerNode
         
         stopAllTracks()
         self.loop(playerNode, from: track)
         playerNode.play()
-        activePlayerNodes[track.id] = playerNode
+        shiftPitch(of: track, by: track.semitoneShift)
+        activeAudioNodes[track.id] = audioNode
     }
     
     /// Stops a track from playing.
     public func stop(_ track : Track) {
-        if let playerNode = activePlayerNodes[track.id] {
-            playerNode.stop()
-            activePlayerNodes[track.id] = nil
+        if let audioNode = activeAudioNodes[track.id] {
+            audioNode.playerNode.stop()
+            activeAudioNodes[track.id] = nil
        }
     }
     
     /// Stops all tracks from playing.
     public func stopAllTracks() {
-        for (_, playerNode) in activePlayerNodes {
-            playerNode.stop()
+        for (_, audioNode) in activeAudioNodes {
+            audioNode.playerNode.stop()
         }
-        activePlayerNodes.removeAll()
+        activeAudioNodes.removeAll()
     }
     
     /// Returns True iff a track is actively playing.
     public func isPlaying(_ track: Track) -> Bool {
-        return activePlayerNodes[track.id] != nil
+        return activeAudioNodes[track.id] != nil
+    }
+    
+    /// Shift the pitch of a track.
+    public func shiftPitch(of track: Track, by semitones: Int) {
+        let audioNode = audioNode(track)
+        audioNode.pitchNode.pitch = Float(semitones) * 100.0
     }
     
     // MARK: - Initialization
 
     init() {
         audioEngine = AVAudioEngine()
-        playerNodes = [:]
-        activePlayerNodes = [:]
-
+        audioNodes = [:]
+        activeAudioNodes = [:]
+        
+        print("init Audio Mixer")
+        
         // A Silent Buffer is a hack to avoid an empty engine which can cause problems.
         let silentPlayerNode = AVAudioPlayerNode()
         audioEngine.attach(silentPlayerNode)
@@ -62,19 +66,17 @@ class AudioMixer: ObservableObject {
         audioEngine.connect(silentPlayerNode, to: audioEngine.mainMixerNode, format: silentBuffer.format)
         audioEngine.connect(audioEngine.mainMixerNode, to: audioEngine.outputNode, format: nil)
 
+        print("connected mixer node")
         do {
-            try AVAudioSession.sharedInstance().setCategory(.playback)
-            try AVAudioSession.sharedInstance().setActive(true)
-        } catch {
-            print("Error setting up audio session: \(error)")
-        }
-
-        do {
+            print("starting audio engine")
             try audioEngine.start()
+            print("playing silent buffer")
             playSilentBuffer(silentPlayerNode: silentPlayerNode, silentBuffer: silentBuffer)
         } catch {
-            print(error)
+            print("Error starting audio engine: \(error)")
         }
+        
+        print("audio engine is running: \(audioEngine.isRunning)")
     }
     
     // MARK: - Private Methods
@@ -112,18 +114,31 @@ class AudioMixer: ObservableObject {
             self.loop(playerNode, from: track)
         }
     }
-    private func playerNode(_ track : Track) -> AVAudioPlayerNode {
+    private func audioNode(_ track : Track) -> AudioNode {
         let tid = track.id
-        if playerNodes[tid] == nil {
+        if audioNodes[tid] == nil {
             let playerNode = AVAudioPlayerNode()
+            let pitchNode = AVAudioUnitTimePitch()
+
             audioEngine.attach(playerNode)
-            print("adding player for \(tid)")
-            playerNodes[tid] = playerNode
-            audioEngine.connect(playerNode,
-                                to: audioEngine.mainMixerNode,
-                                format: track.audioFile().processingFormat)
+            audioEngine.attach(pitchNode)
+
+            audioNodes[tid] = AudioNode(playerNode: playerNode, pitchNode: pitchNode)
+            audioEngine.connect(playerNode, to: pitchNode, format: track.audioFile().processingFormat)
+            audioEngine.connect(pitchNode, to: audioEngine.mainMixerNode, format: track.audioFile().processingFormat)
+
         }
-        return playerNodes[tid]!
+        return audioNodes[tid]!
     }
     
+}
+
+struct AudioNode {
+    let playerNode: AVAudioPlayerNode
+    let pitchNode: AVAudioUnitTimePitch
+    
+    init(playerNode: AVAudioPlayerNode, pitchNode: AVAudioUnitTimePitch) {
+        self.playerNode = playerNode
+        self.pitchNode = pitchNode
+    }
 }
