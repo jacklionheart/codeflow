@@ -15,36 +15,41 @@ class Track: Object, ObjectKeyIdentifiable {
     
     public enum Subtype: String {
         case Recording
-        case Group
+        case Mix
         case Sequence
     }
 
     // MARK: Persisted values
 
     @Persisted(primaryKey: true) var _id: ObjectId
-    @Persisted var name = Object.randomName()
+    @Persisted var name = ""
     @Persisted var creationDate = Date()
     // Start time into the source, in seconds.
     @Persisted var startSeconds = 0.0
     // Duration past start-time to play, in seconds.
     @Persisted var durationSeconds = 0.0
-    @Persisted<Int> var semitoneShift = 0
+    // Cents of pitch shift (-2400, 2400)
+    @Persisted var pitchCents = 0.0
+    @Persisted var playbackRate = 1.0
     @Persisted var sourceURL = ""
     @Persisted var subtracks = RealmSwift.List<Track>()
     @Persisted var parent: Track?
-    @Persisted var creator: Creator?
+    @Persisted var creator: Person?
     @Persisted var volume = 1.0
     @Persisted var subtypeRaw = Subtype.Recording.rawValue
 
     // MARK: Initializers
     
-    convenience init(sourceURL: String) {
+    convenience init(name: String, sourceURL: String) {
         self.init()
+        self.name = name
         self.sourceURL = sourceURL
-        durationSeconds = audioFile().duration
-        print("Duration (s) \(durationSeconds)")
-        print("Creating Track: \(name)")
-        print("URL: \(sourceURL)")
+        let af = audioFile()
+        durationSeconds = Double(af.length) / af.fileFormat.sampleRate
+        AppLogger.model.info("Model.Track.init")
+        AppLogger.model.info("Duration (s) \(self.durationSeconds)")
+        AppLogger.model.info("Creating Track: \(name)")
+        AppLogger.model.info("URL: \(sourceURL)")
     }
     
     // MARK: Audio-facing API
@@ -65,15 +70,15 @@ class Track: Object, ObjectKeyIdentifiable {
         }
     }
     
-    // `convertToArrangement` converts a Recording-type track
-    // to an Arrangment by making a new subtrack which is a copy of this track,
-    // and then converting this track into an Arrangement type.
-    public func convertToGroup() {
+    // `convertToMix` converts a Recording-type track
+    // to an Mix by making a new subtrack which is a copy of this track,
+    // and then converting this track into an Mix type.
+    public func convertToMix() {
         assert(subtype == .Recording)
 
         let newTrack = createCopy()
-        subtype = .Group
-        subtracks.append(newTrack)
+        subtype = .Mix
+        addSubtrack(newTrack)
         sourceURL = ""
         resetMix()
         denormalize()
@@ -82,7 +87,7 @@ class Track: Object, ObjectKeyIdentifiable {
     public func addSubtrack(_ subtrack: Track) {
         assert(subtrack.parent == nil)
         if subtype == Subtype.Recording {
-            convertToGroup()
+            self.convertToMix()
         }
         
         subtracks.append(subtrack)
@@ -93,11 +98,25 @@ class Track: Object, ObjectKeyIdentifiable {
     
     public func resetMix() {
         volume = 1.0
+        pitchCents = 0.0
+        playbackRate = 1.0
     }
     
     public func audioFile() -> AVAudioFile {
-        print("Reading audio file from URL: \(sourceURL)")
+        assert(subtype == Subtype.Recording)
+
+        AppLogger.model.debug("Model.Track.audioFile Reading audio file from URL: \(self.sourceURL)")
         return try! AVAudioFile(forReading: URL(string: sourceURL)!)
+    }
+    
+    public func format() -> AVAudioFormat {
+        if subtype == .Recording {
+            return audioFile().processingFormat
+        } else {
+            assert(subtype == .Mix)
+            assert(subtracks.count > 0)
+            return subtracks[0].format()
+        }
     }
         
     // MARK: Private Manipulation
@@ -111,7 +130,7 @@ class Track: Object, ObjectKeyIdentifiable {
         newTrack.sourceURL = sourceURL
         newTrack.durationSeconds = durationSeconds
         newTrack.volume = volume
-        newTrack.semitoneShift = semitoneShift
+        newTrack.pitchCents = pitchCents
         // parent is not copied
         
         newTrack.denormalize()
@@ -121,7 +140,7 @@ class Track: Object, ObjectKeyIdentifiable {
         
     // `denormalize` stores derived data from subtracks onto the track.
     private func denormalize() {
-        if subtype == .Group {
+        if subtype == .Mix {
             if subtracks.count == 0 {
                 durationSeconds = 0
             } else {

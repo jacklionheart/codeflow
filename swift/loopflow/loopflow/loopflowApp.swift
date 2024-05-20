@@ -10,11 +10,12 @@ import SwiftUI
 @main
 struct LoopflowApp: App {
     var session = RealmSession()
-    var audioMixer = AudioMixer()
+    var audio = Audio()
 
     var body: some Scene {
         WindowGroup {
-            Loopflow().environmentObject(session).environmentObject(audioMixer)
+            LoopflowView().environmentObject(session).environmentObject(audio)
         }
     }
+    
 }
