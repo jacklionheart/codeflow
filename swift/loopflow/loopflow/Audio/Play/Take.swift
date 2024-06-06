@@ -5,14 +5,17 @@ import Combine
 //
 //
 //
-class Take : Playable {
-    var audioEngine: AVAudioEngine
-    public var track: Track
-    var playerNode: AVAudioPlayerNode
-    var trackTimePitch: TrackTimePitch
-    var parent: AVAudioNode
-    private var cancellables = Set<AnyCancellable>()
+class Take :  TrackPlayerInternal {
+    // MARK: - Member variables
 
+    // Initialization paramters
+    var track: Track
+    var audioEngine: AVAudioEngine
+    var parent: AVAudioNode
+    
+    // Internal implementation
+    private var playerNode: AVAudioPlayerNode
+    
     // MARK: - Public Methods
     
     public func play() {
@@ -24,10 +27,12 @@ class Take : Playable {
     public func stop() {
         playerNode.stop()
     }
+    
+    public func pause() {
+        playerNode.stop()
+    }
 
-    // MARK: - Initialization
-
-/// Loops a track by scheduling it to
+    /// Loops a track by scheduling it to
     private func loop() {
         let audioFile = track.audioFile()
         let sampleRate = audioFile.processingFormat.sampleRate
@@ -38,7 +43,7 @@ class Take : Playable {
         let trackName = track.name
 
         AppLogger.audio.info("""
-               audio.track.play
+               audio.track.take.play
                --- Playing track ---
                Track name: \(trackName)
                Track location: \(trackURL)
@@ -54,51 +59,25 @@ class Take : Playable {
         }
     }
     
-    private func cleanup() {
-        audioEngine.detach(playerNode)
+    func updateVolume(_ volume : Float) {
+        playerNode.volume = volume
     }
-
-    private func subscribeToChanges() {
-        let notificationToken = track.thaw()!.observe { [weak self] change in
-            switch change {
-            case .change(_, let properties): // Correctly access the properties array in the tuple
-                for property in properties {
-                    if property.name == "volume", let newValue = property.newValue as? Double {
-                        // Update the published pitchCents when the property changes
-                        DispatchQueue.main.async {
-                            self!.playerNode.volume = Float(newValue)
-                        }
-                    }
-
-                }
-            case .error(let error):
-                AppLogger.audio.debug("An error occurred: \(error)")
-            case .deleted:
-                AppLogger.audio.debug("The object was deleted.")
-            }
-        }
-
-        // Convert the Realm notification token into a Combine cancellable and add it to the set.
-        AnyCancellable {
-            notificationToken.invalidate()
-        }.store(in: &cancellables)
-    }
+    
+    // MARK: - Initialization
     
     init(_ track: Track, parent: AVAudioNode, audioEngine: AVAudioEngine) {
         self.track = track
-        self.audioEngine = audioEngine
         self.parent = parent
+        self.audioEngine = audioEngine
         playerNode = AVAudioPlayerNode()
-        playerNode.volume = Float(track.volume)
-        trackTimePitch = TrackTimePitch(track, parent: parent, audioEngine: audioEngine)
         audioEngine.attach(playerNode)
-        audioEngine.connect(playerNode, to: trackTimePitch.timePitchNode, format: track.format())
-        subscribeToChanges()
+        audioEngine.connect(playerNode, to: parent, format: track.format())
+        playerNode.volume = Float(track.volume)
     }
     
     deinit {
-        // Cancel all subscriptions when this object is being deinitialized
-        cancellables.forEach { $0.cancel() }
-        cleanup()
+        audioEngine.disconnectNodeInput(playerNode)
+        audioEngine.disconnectNodeOutput(playerNode)
+        audioEngine.detach(playerNode)
     }
 }

@@ -8,22 +8,21 @@ class Recorder : ObservableObject {
     @Published var avAudioRecorder: AVAudioRecorder?
     @Published var currentRecordingPath: URL?
     @Published public var name: String
-    
+    @Published var elapsedTime: TimeInterval = 0
+    private var startTime: Date?
+    private var timer: Timer?
+
     init() {
         avAudioRecorder = nil
         name = ""
         currentRecordingPath = nil
     }
     
-    private static func fileDirectory() -> URL {
-        FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-    }
-    
     
     private static func newUrl(for date: Date) -> URL {
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "yyyyMMdd_HHmmss"
-        return Recorder.fileDirectory().appendingPathComponent("Loopflow_Recording_\(dateFormatter.string(from: date)).m4a")
+        return Track.fileDirectory().appendingPathComponent("Loopflow_Recording_\(dateFormatter.string(from: date)).m4a")
     }
     
     var active: Bool {
@@ -45,7 +44,12 @@ class Recorder : ObservableObject {
                 let date = Date()
                 currentRecordingPath = Recorder.newUrl(for: date)
                 avAudioRecorder = try AVAudioRecorder.init(url: currentRecordingPath!, settings: settings)
+                startTime = Date()
                 avAudioRecorder!.record()
+                elapsedTime = 0
+                timer = Timer.scheduledTimer(withTimeInterval: 0.02, repeats: true) { [weak self] _ in
+                    self?.updateElapsedTime()
+                }
                 name = Object.randomName()
                 AppLogger.audio.debug("audio.record.start recording to \(self.currentRecordingPath!.absoluteString) active:\(self.active)")
             } catch let error {
@@ -60,6 +64,9 @@ class Recorder : ObservableObject {
         AppLogger.audio.info("audio.record.stop active:\(self.active) to:\(to)")
         if active {
             avAudioRecorder!.stop()
+            timer = nil
+            startTime = nil
+            elapsedTime = 0
             do {
                 let fileManager = FileManager.default
                 let attributes = try fileManager.attributesOfItem(atPath: currentRecordingPath!.path)
@@ -77,7 +84,7 @@ class Recorder : ObservableObject {
             writeToRealm {
                 // TODO: Get realm from session?
                 let realm = try! Realm()
-                let newTrack = Track(name: name, sourceURL: currentRecordingPath!.path)
+                let newTrack = Track(name: name, sourceURL: currentRecordingPath!.lastPathComponent)
                 realm.add(newTrack)
                 if to != nil {
                     to!.thaw()!.addSubtrack(newTrack)
@@ -87,6 +94,11 @@ class Recorder : ObservableObject {
             currentRecordingPath = nil
         }
     }
+    
+    private func updateElapsedTime() {
+          guard let startTime = startTime else { return }
+          elapsedTime = Date().timeIntervalSince(startTime)
+   }
 }
 
 

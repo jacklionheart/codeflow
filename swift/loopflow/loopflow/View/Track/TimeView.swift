@@ -13,7 +13,7 @@ struct TimeView: View {
     
     var body: some View {
         GeometryReader { geometry in
-            Waveform(samples: audioSamples()).foregroundColor(.blue).frame(height: 50)
+            Waveform(samples: audioSamples()).foregroundColor(.red)
         }
     }
 }

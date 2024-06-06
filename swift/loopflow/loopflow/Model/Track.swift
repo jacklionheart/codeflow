@@ -46,7 +46,7 @@ class Track: Object, ObjectKeyIdentifiable {
         self.sourceURL = sourceURL
         let af = audioFile()
         durationSeconds = Double(af.length) / af.fileFormat.sampleRate
-        AppLogger.model.info("Model.Track.init")
+        AppLogger.model.info("Track.init")
         AppLogger.model.info("Duration (s) \(self.durationSeconds)")
         AppLogger.model.info("Creating Track: \(name)")
         AppLogger.model.info("URL: \(sourceURL)")
@@ -104,9 +104,15 @@ class Track: Object, ObjectKeyIdentifiable {
     
     public func audioFile() -> AVAudioFile {
         assert(subtype == Subtype.Recording)
-
-        AppLogger.model.debug("Model.Track.audioFile Reading audio file from URL: \(self.sourceURL)")
-        return try! AVAudioFile(forReading: URL(string: sourceURL)!)
+        
+        let audioURL = Track.fileDirectory().appendingPathComponent(sourceURL)
+        AppLogger.model.debug("Track.audioFile Reading audio file from URL: \(audioURL)")
+        do {
+            return try AVAudioFile(forReading: audioURL)
+        } catch {
+            AppLogger.model.error("Track.audioFile Failed to open audio file: \(error.localizedDescription)")
+            fatalError(error.localizedDescription)
+        }
     }
     
     public func format() -> AVAudioFormat {
@@ -148,6 +154,15 @@ class Track: Object, ObjectKeyIdentifiable {
             }
         }
     }
+    
+    //
+    // MARK: STATIC
+    //
+    
+    static func fileDirectory() -> URL {
+        FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+    }
+    
 }
 
 

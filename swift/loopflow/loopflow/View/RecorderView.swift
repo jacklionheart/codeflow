@@ -2,7 +2,6 @@ import SwiftUI
 
 struct RecorderView: View {
     @ObservedObject var recorder: Recorder
-    @ObservedObject var player: Player
 
     var parent: Track?
     var body: some View {
@@ -10,6 +9,7 @@ struct RecorderView: View {
             Spacer()
             if (recorder.active) {
                 Text(recorder.name).bold()
+                Text(Format.duration(recorder.elapsedTime)).font(.headline)
             }
             Spacer()
             RecorderButton(recorder: recorder, start: {
@@ -18,7 +18,7 @@ struct RecorderView: View {
             }, stop: {
                 AppLogger.ui.debug("RecorderView stop")
                 recorder.stop(to: parent)
-                player.stop()
+                SingletonPlayer.shared.stop()
             })
         }
         .frame(maxWidth: .infinity, maxHeight: recorder.active ? 200 : 100)

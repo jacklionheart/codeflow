@@ -38,22 +38,22 @@ struct PitchSlider: View {
 }
 
 struct PlayButton: View {
-    @ObservedObject var player: Player
+    @ObservedObject var trackPlayer: TrackPlayer
     @ObservedRealmObject var track: Track
     
     var body: some View {
         Button(action: {
-            if player.isPlaying(track) {
+            if trackPlayer.isPlaying {
                 AppLogger.ui.debug("PlayerView PlayButton stop: \(track.name)")
-                player.stop()
+                trackPlayer.stop()
             } else {
                 AppLogger.ui.debug("PlayerView PlayButton start: \(track.name)")
-                player.start(track)
+                trackPlayer.play()
             }
         }) {
-            Image(systemName: player.isPlaying(track) ? "pause.fill" : "play.fill")
+            Image(systemName: trackPlayer.isPlaying ? "pause.fill" : "play.fill")
                 .font(.system(size: 40))
                 .foregroundColor(.blue)
-        }
+        }.buttonStyle(PlainButtonStyle())
     }
 }
