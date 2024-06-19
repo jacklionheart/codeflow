@@ -6,7 +6,7 @@ struct EditorView: View {
     @EnvironmentObject var session: RealmSession
     @ObservedObject var audio: Audio
     @ObservedRealmObject var track: Track
-    @ObservedObject var trackPlayer: TrackPlayer
+    @ObservedObject var trackAudio: TrackAudio
 
     @Environment(\.presentationMode) var presentationMode
     
@@ -20,7 +20,7 @@ struct EditorView: View {
                     Text(Format.duration(track.durationSeconds))
                 }.foregroundColor(.gray)
                 HStack {
-                    PlayButton(trackPlayer: trackPlayer, track: track)
+                    PlayButton(trackAudio: trackAudio, track: track)
                 }
             }
             VStack(alignment: .leading) {

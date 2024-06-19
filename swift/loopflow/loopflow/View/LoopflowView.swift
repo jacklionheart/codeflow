@@ -17,14 +17,14 @@ struct LoopflowView: View {
                 }
                 List {
                     ForEach(tracks) { track in
-                        PlayerView(track:track, trackPlayer: audio.player(for: track),
+                        PlayerView(track:track, trackAudio: audio.audio(for: track),
                                    onEdit: {presentedTracks.append(track)})
                     }
                 }.listStyle(PlainListStyle())
                 RecorderView(recorder: audio.record)
             }
             .navigationDestination(for: Track.self) { track in
-                EditorView(audio: audio, track: track, trackPlayer: audio.player(for: track))
+                EditorView(audio: audio, track: track, trackAudio: audio.audio(for: track))
             }
         }
     }

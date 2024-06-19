@@ -4,7 +4,8 @@ import AVFoundation
 import os.log
 
 class Recorder : ObservableObject {
-        
+    public var trackManager: TrackManager
+    
     @Published var avAudioRecorder: AVAudioRecorder?
     @Published var currentRecordingPath: URL?
     @Published public var name: String
@@ -12,7 +13,8 @@ class Recorder : ObservableObject {
     private var startTime: Date?
     private var timer: Timer?
 
-    init() {
+    init(trackManager: TrackManager) {
+        self.trackManager = trackManager
         avAudioRecorder = nil
         name = ""
         currentRecordingPath = nil
@@ -64,6 +66,7 @@ class Recorder : ObservableObject {
         AppLogger.audio.info("audio.record.stop active:\(self.active) to:\(to)")
         if active {
             avAudioRecorder!.stop()
+            trackManager.stop()
             timer = nil
             startTime = nil
             elapsedTime = 0

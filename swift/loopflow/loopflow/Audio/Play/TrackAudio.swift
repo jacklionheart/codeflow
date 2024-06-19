@@ -8,9 +8,9 @@
 import Foundation
 import AVFoundation
 import Combine
+import RealmSwift
 
-
-protocol TrackPlayerInternal {
+protocol TrackPlayer {
     func play()
     func stop()
 
@@ -19,8 +19,8 @@ protocol TrackPlayerInternal {
 
 
 
-// TrackPlayer is the object used by views to play, pause, and stop a track.
-class TrackPlayer : ObservableObject {
+// TrackAudio is the object used by views to play, pause, and stop a track.
+class TrackAudio : ObservableObject {
     // MARK: - Member variables
     
     // Initialization parameters
@@ -33,7 +33,7 @@ class TrackPlayer : ObservableObject {
 
     // Internal implementation
     private var timePitchNode: AVAudioUnitTimePitch
-    private var internalPlayer: TrackPlayerInternal
+    private var trackPlayer: TrackPlayer
     private var cancellables = Set<AnyCancellable>()
     
 
@@ -42,8 +42,7 @@ class TrackPlayer : ObservableObject {
     // Plays a track, pausing any currently playing track.
     // Continues from where last paused, or else the beginning.
     public func play() {
-        SingletonPlayer.shared.replace(with: self)
-        internalPlayer.play()
+        trackPlayer.play()
         isPlaying = true
     }
     
@@ -56,7 +55,7 @@ class TrackPlayer : ObservableObject {
     
     // Stop playing a track and returns to the beginning for future plays.
     public func stop() {
-        internalPlayer.stop()
+        trackPlayer.stop()
         isPlaying = false
     }
     
@@ -67,15 +66,22 @@ class TrackPlayer : ObservableObject {
     private func subscribeToChanges() {
         let notificationToken = track.thaw()!.observe { [weak self] change in
             switch change {
-            case .change(_, let properties): // Correctly access the properties array in the tuple
+            case .change(_, let properties):
                 for property in properties {
-                    if property.name == "volume", let newValue = property.newValue as? Double {
-                        // Update the published pitchCents when the property changes
+                   if property.name == "subtracks" {
                         DispatchQueue.main.async {
-                            self!.internalPlayer.updateVolume(Float(newValue))
+                            self!.trackPlayer.stop()
+                            self!.installTrackPlayer()
                         }
                     }
                     
+                    if property.name == "volume", let newValue = property.newValue as? Double {
+                        // Update the published pitchCents when the property changes
+                        DispatchQueue.main.async {
+                            self!.trackPlayer.updateVolume(Float(newValue))
+                        }
+                    }
+
                     if property.name == "pitchCents", let newValue = property.newValue as? Double {
                         DispatchQueue.main.async {
                             self!.timePitchNode.pitch = Float(newValue)
@@ -100,23 +106,50 @@ class TrackPlayer : ObservableObject {
         }.store(in: &cancellables)
     }
     
+    func installTrackPlayer() {
+        AppLogger.audio.debug("Reinstalling trackplayer for \(self.track.name).")
+        AppLogger.audio.debug("Num subtracks \(self.track.subtracks.count).")
+
+        track = track.thaw()!.freeze()
+        
+        audioEngine.disconnectNodeInput(timePitchNode)
+        audioEngine.disconnectNodeOutput(timePitchNode)
+        audioEngine.detach(timePitchNode)
+        audioEngine.attach(timePitchNode)
+        
+        
+
+        if track.subtype == .Mix {
+            trackPlayer = Mix(track, parent: timePitchNode, audioEngine: audioEngine)
+        } else {
+            assert(track.subtype == .Recording)
+            trackPlayer = Recording(track, parent: timePitchNode, audioEngine: audioEngine)
+        }
+
+        audioEngine.connect(timePitchNode, to: parent, format: track.format())
+    }
+    
     init(_ track: Track, parent: AVAudioNode, audioEngine: AVAudioEngine) {
+        AppLogger.audio.debug("Creating trackPlayer for \(track.name)")
+        
         self.track = track
         self.parent = parent
         self.audioEngine = audioEngine
         
         timePitchNode = AVAudioUnitTimePitch()
         audioEngine.attach(timePitchNode)
-        audioEngine.connect(timePitchNode, to: parent, format: track.format())
         timePitchNode.pitch = Float(track.pitchCents)
         timePitchNode.rate = Float(track.playbackRate)
-        
+
         if track.subtype == .Mix {
-            internalPlayer = Mix(track, parent: timePitchNode, audioEngine: audioEngine)
+            trackPlayer = Mix(track, parent: timePitchNode, audioEngine: audioEngine)
         } else {
             assert(track.subtype == .Recording)
-            internalPlayer = Take(track, parent: timePitchNode, audioEngine: audioEngine)
+            trackPlayer = Recording(track, parent: timePitchNode, audioEngine: audioEngine)
         }
+        
+        // Connect nodes in a bottom up order
+        audioEngine.connect(timePitchNode, to: parent, format: track.format())
 
         subscribeToChanges()
     }
@@ -129,23 +162,5 @@ class TrackPlayer : ObservableObject {
         audioEngine.detach(timePitchNode)
 
         cancellables.forEach { $0.cancel() }
-    }
-}
-
-// SingletonPlayer ensures only one track ever plays at a time.
-class SingletonPlayer : ObservableObject {
-    static let shared = SingletonPlayer()
-
-    @Published var currentPlayer: TrackPlayer?
-    
-    public func replace(with trackPlayer: TrackPlayer?) {
-        if currentPlayer != nil {
-            currentPlayer!.stop()
-        }
-        currentPlayer = trackPlayer
-    }
-    
-    public func stop() {
-        replace(with: nil)
     }
 }

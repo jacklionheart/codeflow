@@ -4,8 +4,9 @@ import AVFoundation
 
 struct PlayerView: View {
     @EnvironmentObject var session: RealmSession
+    @EnvironmentObject var audio: Audio
     @ObservedRealmObject var track: Track
-    @ObservedObject var trackPlayer: TrackPlayer
+    @ObservedObject var trackAudio: TrackAudio
     @State private var expanded = false
     var onEdit: () -> Void
 
@@ -19,7 +20,7 @@ struct PlayerView: View {
                 Text(Format.duration(track.durationSeconds))
             }.foregroundColor(.gray)
             HStack {
-                PlayButton(trackPlayer: trackPlayer, track: track)
+                PlayButton(trackAudio: trackAudio, track: track)
                 Spacer()
                 Button(action: {
                     onEdit()

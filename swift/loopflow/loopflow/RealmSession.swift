@@ -7,7 +7,7 @@ class RealmSession: ObservableObject {
     var realm: Realm
     
     init() {
-        // try! FileManager.default.removeItem(at: Realm.Configuration.defaultConfiguration.fileURL!)
+        try! FileManager.default.removeItem(at: Realm.Configuration.defaultConfiguration.fileURL!)
         let configuration = Realm.Configuration(deleteRealmIfMigrationNeeded: true)
         realm = try! Realm(configuration: configuration)
      }

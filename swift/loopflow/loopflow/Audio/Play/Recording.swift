@@ -5,7 +5,7 @@ import Combine
 //
 //
 //
-class Take :  TrackPlayerInternal {
+class Recording : TrackPlayer {
     // MARK: - Member variables
 
     // Initialization paramters
@@ -25,7 +25,8 @@ class Take :  TrackPlayerInternal {
     
     /// Stops a track from playing.
     public func stop() {
-        playerNode.stop()
+        playerNode.pause()
+        playerNode.reset()
     }
     
     public func pause() {

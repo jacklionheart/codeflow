@@ -18,7 +18,6 @@ struct RecorderView: View {
             }, stop: {
                 AppLogger.ui.debug("RecorderView stop")
                 recorder.stop(to: parent)
-                SingletonPlayer.shared.stop()
             })
         }
         .frame(maxWidth: .infinity, maxHeight: recorder.active ? 200 : 100)

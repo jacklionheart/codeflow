@@ -2,7 +2,7 @@ import Foundation
 import AVFoundation
 import Combine
 
-class Mix : TrackPlayerInternal, ObservableObject {
+class Mix : TrackPlayer {
     // MARK: - Member variables
 
     // Initialization paramters
@@ -12,17 +12,17 @@ class Mix : TrackPlayerInternal, ObservableObject {
 
     // Internal implementation
     var mixerNode: AVAudioMixerNode
-    var subtrackPlayers: [TrackPlayer] = []
+    var subtrackAudios: [TrackAudio] = []
 
     // MARK: - Public Methods
     
     public func play() {
-        subtrackPlayers.forEach { $0.play() }
+        subtrackAudios.forEach { $0.play() }
     }
     
     // Stops a track from playing.
     public func stop() {
-        subtrackPlayers.forEach { $0.stop() }
+        subtrackAudios.forEach { $0.stop() }
     }
     
     func updateVolume(_ volume : Float) {
@@ -41,14 +41,16 @@ class Mix : TrackPlayerInternal, ObservableObject {
         audioEngine.attach(mixerNode)
 
         track.subtracks.forEach { subtrack in
-            subtrackPlayers.append(TrackPlayer(subtrack, parent: mixerNode, audioEngine: audioEngine))
+            let subtrackAudio = TrackAudio(subtrack, parent: mixerNode, audioEngine: audioEngine)
+            subtrackAudios.append(subtrackAudio)
         }
+        
+        // Connect nodes in a bottom up order
         audioEngine.connect(mixerNode, to: parent, format: track.format())
-
     }
 
     deinit {
-        subtrackPlayers = []
+        subtrackAudios = []
         audioEngine.disconnectNodeInput(mixerNode)
         audioEngine.disconnectNodeOutput(mixerNode)
         audioEngine.detach(mixerNode)
