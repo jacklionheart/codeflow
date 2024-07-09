@@ -1,12 +1,3 @@
-//
-//  Object.swift
-//  fantasia
-//
-//  Created by Jack Heart on 4/19/23.
-//
-//  Extends RealmSwift's Object with Loopflow-specific functionality
-//  and provides a namespace for the Model external API.
-
 import Foundation
 import RealmSwift
 
@@ -28,7 +19,7 @@ extension Object {
     }
 }
 
-func transaction(_ f: () -> Void) {
+func writeToRealm(_ f: () -> Void) {
     let realm = try! Realm()
     try! realm.write {
         f()
