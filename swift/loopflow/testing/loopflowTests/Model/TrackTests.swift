@@ -1,14 +1,13 @@
 //
-//  loopflowTests.swift
+//  TrackTests.swift
 //  loopflowTests
 //
-//  Created by Jack Heart on 10/2/23.
+//  Created by Jack Heart on 6/25/24.
 //
 
 import XCTest
-@testable import loopflow
 
-final class loopflowTests: XCTestCase {
+final class TrackTests: XCTestCase {
 
     override func setUpWithError() throws {
         // Put setup code here. This method is called before the invocation of each test method in the class.

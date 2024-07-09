@@ -8,7 +8,7 @@
 import Foundation
 import AVFoundation
 
-class TrackManager : ObservableObject {
+class TrackSingleton : ObservableObject {
     var audioEngine: AVAudioEngine
     
     @Published public var currentAudio: TrackAudio?
@@ -25,6 +25,13 @@ class TrackManager : ObservableObject {
         }
     }
     
+    func pause() {
+        if currentAudio != nil {
+            currentAudio!.pause()
+            currentAudio = nil
+        }
+    }
+    
     func stop() {
         if currentAudio != nil {
             currentAudio!.stop()
@@ -33,7 +40,7 @@ class TrackManager : ObservableObject {
     }
     
     func play(_ trackAudio : TrackAudio) {
-        stop()
+        pause()
         currentAudio = trackAudio
         trackAudio.play()
     }
