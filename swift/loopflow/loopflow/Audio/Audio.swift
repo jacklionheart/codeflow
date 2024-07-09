@@ -4,14 +4,14 @@ import AVFoundation
 class Audio : ObservableObject {
     var audioEngine: AVAudioEngine
     @Published public var record: Recorder
-    @Published public var trackManager: TrackManager
+    @Published public var trackManager: TrackSingleton
 
     func audio(for track: Track) -> TrackAudio {
         return trackManager.audio(for: track)
     }
     
-    func stop() {
-        return trackManager.stop()
+    func pause() {
+        return trackManager.pause()
     }
     
     func play(_ trackAudio : TrackAudio) {
@@ -42,9 +42,9 @@ class Audio : ObservableObject {
             AppLogger.audio.error("audio.init error starting audio engine: \(error)")
         }
 
-        let trackManager = TrackManager(audioEngine: audioEngine)
-            self.trackManager = trackManager
-        self.record = Recorder(trackManager: trackManager)
+        let trackManager = TrackSingleton(audioEngine: audioEngine)
+        self.trackManager = trackManager
+        self.record = Recorder(audioEngine: audioEngine, trackManager: trackManager)
     }
 }
   

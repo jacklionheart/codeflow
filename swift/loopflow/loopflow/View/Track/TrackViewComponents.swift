@@ -45,8 +45,8 @@ struct PlayButton: View {
     var body: some View {
         Button(action: {
             if trackAudio.isPlaying {
-                AppLogger.ui.debug("PlayerView PlayButton stop: \(track.name)")
-                audio.stop()
+                AppLogger.ui.debug("PlayerView PlayButton pause: \(track.name)")
+                audio.pause()
             } else {
                 AppLogger.ui.debug("PlayerView PlayButton start: \(track.name)")
                 audio.play(trackAudio)

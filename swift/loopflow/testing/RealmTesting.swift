@@ -8,7 +8,6 @@
 import Foundation
 import XCTest
 import RealmSwift
-@testable import loopflow
 
 class RealmTesting {
     static func createInMemoryRealm() -> Realm {

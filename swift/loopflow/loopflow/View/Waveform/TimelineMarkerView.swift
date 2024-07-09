@@ -7,12 +7,34 @@
 
 import SwiftUI
 
-struct TimelineMarkerVIew: View {
+struct TimelineMarkerView: View {
+    let position: CGFloat
+    let height: CGFloat
+    let color: Color
+    let width: CGFloat
+    let showTopIndicator: Bool
+    let showBottomIndicator: Bool
+    
     var body: some View {
-        Text(/*@START_MENU_TOKEN@*/"Hello, World!"/*@END_MENU_TOKEN@*/)
+        ZStack(alignment: .top) {
+            Rectangle()
+                .fill(color)
+                .frame(width: width, height: height)
+            
+            if showTopIndicator {
+                Circle()
+                    .fill(color)
+                    .frame(width: 10, height: 10)
+                    .offset(y: -5)
+            }
+            
+            if showBottomIndicator {
+                Circle()
+                    .fill(color)
+                    .frame(width: 10, height: 10)
+                    .offset(y: height - 10)
+            }
+        }
+        .position(x: position, y: height / 2)
     }
-}
-
-#Preview {
-    TimelineMarkerVIew()
 }

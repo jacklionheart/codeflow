@@ -1,6 +1,6 @@
 
 import argparse
-import pyrubberband
+# import pyrubberband
 import soundfile
 
 def process_audio(input_file, output_file, time_stretch=1.0, pitch_shift=0):
@@ -17,13 +17,14 @@ def process_audio(input_file, output_file, time_stretch=1.0, pitch_shift=0):
     data, sample_rate = soundfile.read(input_file)
     
     # Apply time-stretching and pitch-shifting
-    processed_data = pyrubberband.time_stretch(data, sample_rate, time_stretch)
-    processed_data = pyrubberband.pitch_shift(processed_data, sample_rate, pitch_shift)
+    # processed_data = pyrubberband.time_stretch(data, sample_rate, time_stretch)
+    # processed_data = pyrubberband.pitch_shift(processed_data, sample_rate, pitch_shift)
     
     # Save processed audio file
-    soundfile.write(output_file, processed_data, sample_rate)
+    # soundfile.write(output_file, processed_data, sample_rate)
 
 if __name__ == "__main__":
+    print("WTF")
     parser = argparse.ArgumentParser(description="Time-stretch and pitch-shift a WAV file.")
     parser.add_argument("input_file", type=str, help="Path to the input WAV file.")
     parser.add_argument("output_file", type=str, help="Path to the output WAV file.")

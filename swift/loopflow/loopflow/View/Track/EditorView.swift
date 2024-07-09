@@ -31,7 +31,6 @@ struct EditorView: View {
                         ForEach(track.subtracks) { subtrack in
                             VStack{
                                 Text(subtrack.name).bold()
-                                TimeView(track:subtrack)
                             }
                         }
                     }.listStyle(PlainListStyle())

@@ -2,69 +2,97 @@ import Foundation
 import AVFoundation
 import Combine
 
-//
-//
-//
-class Recording : TrackPlayer {
-    // MARK: - Member variables
 
+class Recording : TrackAudioNode {
+    
+    // MARK: - Member variables
+    
     // Initialization paramters
     var track: Track
     var audioEngine: AVAudioEngine
     var parent: AVAudioNode
     
+    // Observable properties
+    private(set) var isPlaying = false
+    
+    var currentPosition : Double {
+        if playerNode.lastRenderTime == nil {
+            return startPosition
+        }
+        
+        let playerTime = playerNode.playerTime(forNodeTime: playerNode.lastRenderTime!)!
+        let sampleRate = track.format.sampleRate
+        
+        return Double(playerTime.sampleTime) / sampleRate + startPosition
+    }
+    
     // Internal implementation
     private var playerNode: AVAudioPlayerNode
+    private var startPosition = 0.0
+    private var isSegmentScheduled = false
+
+    // MARK: - Methods
     
-    // MARK: - Public Methods
-    
-    public func play() {
-        self.loop()
+    func play() {
+        if !isSegmentScheduled {
+            self.loop()
+        }
         playerNode.play()
+        isPlaying = true
     }
     
     /// Stops a track from playing.
-    public func stop() {
-        playerNode.pause()
-        playerNode.reset()
+    func stop() {
+        playerNode.stop()
+        isSegmentScheduled = false
+        startPosition = 0.0
+        isPlaying = false
     }
     
-    public func pause() {
-        playerNode.stop()
+    func pause() {
+        playerNode.pause()
+        isPlaying = false
     }
-
-    /// Loops a track by scheduling it to
-    private func loop() {
-        let audioFile = track.audioFile()
-        let sampleRate = audioFile.processingFormat.sampleRate
-        let startSample = AVAudioFramePosition(track.startSeconds * sampleRate)
-        let endSample = AVAudioFramePosition((track.startSeconds + track.durationSeconds) * sampleRate)
-        let frameCount = AVAudioFrameCount(endSample - startSample)
-        let trackURL = track.sourceURL
-        let trackName = track.name
-
-        AppLogger.audio.info("""
-               audio.track.take.play
-               --- Playing track ---
-               Track name: \(trackName)
-               Track location: \(trackURL)
-               Sample Rate: \(sampleRate)
-               Start Sample: \(startSample)
-               End Sample: \(endSample)
-               Frame Count: \(frameCount)
-               -------------------------------
-               """)
-        
-        playerNode.scheduleSegment(audioFile, startingFrame: startSample, frameCount: frameCount, at: nil) {
-            self.loop()
+    
+    func receiveNewVolume(_ volume : Double) {
+        playerNode.volume = Float(volume)
+    }
+    
+    func receiveNewStartSeconds(_ newStart: Double) {
+        if isPlaying && newStart > currentPosition {
+            stop()
         }
     }
     
-    func updateVolume(_ volume : Float) {
-        playerNode.volume = volume
+    func receiveNewStopSeconds(_ newStop: Double) {
+        if isPlaying {
+            if newStop <= currentPosition {
+                stop()
+            }
+            if newStop > currentPosition {
+                let from = currentPosition
+                stop()
+                loop(from: from)
+            }
+        }
     }
     
-    // MARK: - Initialization
+    // Implementation
+
+    private func loop(from: Double = 0.0) {
+        let audioFile = track.audioFile
+        let sampleRate = audioFile.processingFormat.sampleRate
+        let startFrame = AVAudioFramePosition((track.thaw()!.startSeconds + from) * sampleRate)
+        let totalFrames = AVAudioFramePosition(track.thaw()!.stopSeconds * sampleRate) - startFrame
+        startPosition = from
+        
+        playerNode.scheduleSegment(audioFile, startingFrame: startFrame, frameCount: AVAudioFrameCount(totalFrames), at: nil) {
+            self.loop()
+        }
+    }
+
+    
+    // MARK: - Initialization and deinitialization
     
     init(_ track: Track, parent: AVAudioNode, audioEngine: AVAudioEngine) {
         self.track = track
@@ -72,7 +100,7 @@ class Recording : TrackPlayer {
         self.audioEngine = audioEngine
         playerNode = AVAudioPlayerNode()
         audioEngine.attach(playerNode)
-        audioEngine.connect(playerNode, to: parent, format: track.format())
+        audioEngine.connect(playerNode, to: parent, format: track.format)
         playerNode.volume = Float(track.volume)
     }
     

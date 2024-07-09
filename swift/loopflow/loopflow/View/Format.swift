@@ -46,11 +46,11 @@ struct Format {
         let minutes = (Int(seconds) % 3600) / 60
         let remainingSeconds = Int(seconds) % 60
         if hours > 0 {
-            return String(format: "%02d hr %02d min %02d sec", hours, minutes, remainingSeconds)
-        } else if minutes > 1 {
-            return String(format: "%02d min %02d sec", minutes, remainingSeconds)
+            return String(format: "%02d:%02d:%02d", hours, minutes, remainingSeconds)
+        } else if minutes > 0 {
+            return String(format: "%02d:%02d", minutes, remainingSeconds)
         } else {
-            return String(format: "%.2f sec", seconds)
+            return String(format: ":%02d", Int(seconds))
         }
     }
 }

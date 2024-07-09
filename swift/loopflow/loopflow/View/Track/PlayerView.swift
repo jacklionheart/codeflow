@@ -30,6 +30,8 @@ struct PlayerView: View {
                         .foregroundColor(.blue)
                 }.buttonStyle(PlainButtonStyle())
             }
+            ScrollableWaveformView(trackAudio: trackAudio, track: track)
+            GlobalWaveformView(trackAudio: trackAudio,  track: track)
         }
     }
 }

@@ -9,12 +9,17 @@ import Foundation
 import AVFoundation
 import Combine
 import RealmSwift
+import Accelerate
 
-protocol TrackPlayer {
+protocol TrackAudioNode {
+    var currentPosition: Double { get }
+
     func play()
+    func pause()
     func stop()
-
-    func updateVolume(_ volume : Float)
+    func receiveNewVolume(_ volume : Double)
+    func receiveNewStartSeconds(_ newStart: Double)
+    func receiveNewStopSeconds(_ newStop: Double)
 }
 
 
@@ -27,25 +32,40 @@ class TrackAudio : ObservableObject {
     var track: Track
     var parent: AVAudioNode
     private var audioEngine: AVAudioEngine
-
+    
     // Observable properties
     @Published var isPlaying: Bool = false
-
+    @Published var currentPosition: Double = 0
+    
     // Internal implementation
     private var timePitchNode: AVAudioUnitTimePitch
-    private var trackPlayer: TrackPlayer
+    private var inputNode: TrackAudioNode
     private var cancellables = Set<AnyCancellable>()
+    private var positionUpdateTimer: Timer?
+
     
-
     // MARK: - Public Methods
-
+    
     // Plays a track, pausing any currently playing track.
     // Continues from where last paused, or else the beginning.
     public func play() {
-        trackPlayer.play()
+        inputNode.play()
+        startPositionUpdates()
         isPlaying = true
     }
     
+    // Stop playing a track and returns to the beginning for future plays.
+    public func pause() {
+        inputNode.pause()
+        stopPositionUpdates()
+        isPlaying = false
+    }
+    
+    public func stop() {
+        inputNode.stop()
+        stopPositionUpdates()
+        isPlaying = false
+    }
     
     // Plays a track from the beginning.
     public func start() {
@@ -53,32 +73,53 @@ class TrackAudio : ObservableObject {
         play()
     }
     
-    // Stop playing a track and returns to the beginning for future plays.
-    public func stop() {
-        trackPlayer.stop()
-        isPlaying = false
+    // MARK: - Implementation
+    
+    private func startPositionUpdates() {
+        positionUpdateTimer = Timer.scheduledTimer(withTimeInterval: 0.016, repeats: true) { [weak self] _ in
+            guard let self = self else { return }
+            self.currentPosition = self.inputNode.currentPosition
+        }
     }
     
- 
+    private func stopPositionUpdates() {
+        positionUpdateTimer?.invalidate()
+        positionUpdateTimer = nil
+    }
+   
     // MARK: - Initialization
     //
     
-    private func subscribeToChanges() {
+    private func subscribeToTrackChanges() {
         let notificationToken = track.thaw()!.observe { [weak self] change in
             switch change {
             case .change(_, let properties):
                 for property in properties {
                    if property.name == "subtracks" {
                         DispatchQueue.main.async {
-                            self!.trackPlayer.stop()
+                            self!.inputNode.stop()
                             self!.installTrackPlayer()
+                        }
+                    }
+                    
+                    if property.name == "startSeconds", let newValue = property.newValue as? Double {
+                        // Update the published pitchCents when the property changes
+                        DispatchQueue.main.async {
+                            self!.inputNode.receiveNewStartSeconds(newValue)
+                        }
+                    }
+                    
+                    if property.name == "stopSeconds", let newValue = property.newValue as? Double {
+                        // Update the published pitchCents when the property changes
+                        DispatchQueue.main.async {
+                            self!.inputNode.receiveNewStopSeconds(newValue)
                         }
                     }
                     
                     if property.name == "volume", let newValue = property.newValue as? Double {
                         // Update the published pitchCents when the property changes
                         DispatchQueue.main.async {
-                            self!.trackPlayer.updateVolume(Float(newValue))
+                            self!.inputNode.receiveNewVolume(newValue)
                         }
                     }
 
@@ -106,7 +147,17 @@ class TrackAudio : ObservableObject {
         }.store(in: &cancellables)
     }
     
+    
+    private func forwardTrackChanges() {
+        // Propagate any changes to any @Persisted property in Track to observers of TrackAudio
+        track.thaw()!.objectWillChange.sink { [weak self] _ in
+            self?.objectWillChange.send()
+        }.store(in: &cancellables)
+    }
+
+    
     func installTrackPlayer() {
+        // TODO: do we need to do all this?
         AppLogger.audio.debug("Reinstalling trackplayer for \(self.track.name).")
         AppLogger.audio.debug("Num subtracks \(self.track.subtracks.count).")
 
@@ -117,17 +168,16 @@ class TrackAudio : ObservableObject {
         audioEngine.detach(timePitchNode)
         audioEngine.attach(timePitchNode)
         
-        
-
         if track.subtype == .Mix {
-            trackPlayer = Mix(track, parent: timePitchNode, audioEngine: audioEngine)
+            inputNode = Mix(track, parent: timePitchNode, audioEngine: audioEngine)
         } else {
             assert(track.subtype == .Recording)
-            trackPlayer = Recording(track, parent: timePitchNode, audioEngine: audioEngine)
+            inputNode = Recording(track, parent: timePitchNode, audioEngine: audioEngine)
         }
 
-        audioEngine.connect(timePitchNode, to: parent, format: track.format())
+        audioEngine.connect(timePitchNode, to: parent, format: track.format)
     }
+        
     
     init(_ track: Track, parent: AVAudioNode, audioEngine: AVAudioEngine) {
         AppLogger.audio.debug("Creating trackPlayer for \(track.name)")
@@ -142,16 +192,17 @@ class TrackAudio : ObservableObject {
         timePitchNode.rate = Float(track.playbackRate)
 
         if track.subtype == .Mix {
-            trackPlayer = Mix(track, parent: timePitchNode, audioEngine: audioEngine)
+            inputNode = Mix(track, parent: timePitchNode, audioEngine: audioEngine)
         } else {
             assert(track.subtype == .Recording)
-            trackPlayer = Recording(track, parent: timePitchNode, audioEngine: audioEngine)
+            inputNode = Recording(track, parent: timePitchNode, audioEngine: audioEngine)
         }
         
         // Connect nodes in a bottom up order
-        audioEngine.connect(timePitchNode, to: parent, format: track.format())
-
-        subscribeToChanges()
+        audioEngine.connect(timePitchNode, to: parent, format: track.format)
+        
+        forwardTrackChanges()
+        subscribeToTrackChanges()
     }
     
     deinit {

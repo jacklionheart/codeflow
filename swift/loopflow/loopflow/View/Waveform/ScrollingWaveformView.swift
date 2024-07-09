@@ -1,7 +1,10 @@
 import SwiftUI
+import RealmSwift
 
-struct ScrollingWaveformView: View {
+struct ScrollableWaveformView: View {
     @ObservedObject var trackAudio: TrackAudio
+    @ObservedRealmObject var track: Track
+    @GestureState private var dragOffset: CGFloat = 0
     
     let barWidth: CGFloat = 2
     let barSpacing: CGFloat = 1
@@ -10,22 +13,22 @@ struct ScrollingWaveformView: View {
     
     var body: some View {
         GeometryReader { geometry in
-            let offset = calculateOffset(geometry: geometry)
+            let markerHeight = geometry.size.height - tickHeight - labelHeight
             ZStack(alignment: .topLeading) {
                 VStack {
                     tickMarksView(geometry: geometry)
-                        .offset(x: offset)
                     WaveformContentView(
-                        amplitudes: trackAudio.track.amplitudes,
+                        amplitudes: track.amplitudes,
                         barWidth: barWidth,
                         barSpacing: barSpacing,
                         scaleX: 1,
                         scaleY: 1,
                         fillColor: .blue
                     )
-                    .frame(height: geometry.size.height - tickHeight - labelHeight)
-                    .offset(x: offset, y: tickHeight + labelHeight)
+                        .frame(height: markerHeight, alignment: .leading)
+                        .offset(y: tickHeight + labelHeight)
                 }
+                .offset(x: calculateOffset(geometry: geometry))
                 
                 // Playhead
                 TimelineMarkerView(
@@ -37,36 +40,16 @@ struct ScrollingWaveformView: View {
                     showBottomIndicator: true
                 )
                 .offset(y: tickHeight + labelHeight)
-                
-                // Start marker
-                TimelineMarkerView(
-                    position: CGFloat(trackAudio.track.startTimeSeconds) / trackAudio.track.playbackDurationSeconds * geometry.size.width,
-                    height: markerHeight,
-                    color: .green,
-                    width: 3,
-                    showTopIndicator: true,
-                    showBottomIndicator: false
-                )
-                .offset(y: tickHeight + labelHeight)
-                
-                // Stop marker
-                TimelineMarkerView(
-                    position: CGFloat(trackAudio.track.stopTimeSeconds) / trackAudio.track.playbackDurationSeconds * geometry.size.width,
-                    height: markerHeight,
-                    color: .blue,
-                    width: 3,
-                    showTopIndicator: true,
-                    showBottomIndicator: false
-                )
-                .offset(y: tickHeight + labelHeight)            }
+            }
             .clipped()
         }
-        .frame(height: 240)
+        .frame(height: 200)
     }
+    
     private func tickMarksView(geometry: GeometryProxy) -> some View {
         let pixelsPerSecond = (barWidth + barSpacing) * CGFloat(Track.AMPLITUDES_PER_SECOND)
-        let totalQuarterSeconds = Int(trackAudio.track.durationSeconds * 4) + 1
-        
+        let totalQuarterSeconds = Int(track.durationSeconds * 4) + 1
+
         return LazyHStack(spacing: 0) {
             ForEach(0..<totalQuarterSeconds, id: \.self) { index in
                 VStack(spacing: 0) {
@@ -76,17 +59,19 @@ struct ScrollingWaveformView: View {
                     if index % 4 == 0 {
                         Text(Format.duration(Double(index) / 4.0))
                             .font(.system(size: 8))
-                    //        .frame(width: pixelsPerSecond, alignment: .leading)
-                    //         .offset(x: 2) // Slight offset to prevent overlap with tick mark
+                            .frame(width: pixelsPerSecond / 4, alignment: .center)
                     } else {
                         Spacer().frame(height: labelHeight)
                     }
                 }
-                .frame(width: pixelsPerSecond / 4) // alignment: .leading)
+                .frame(width: pixelsPerSecond / 4)
+                .offset(x: -pixelsPerSecond / 8) // move frames so center is at x=0
             }
-        }
+        }.frame(width: geometry.size.width, alignment: .leading)
     }
-    
+
+
+
     private func calculateOffset(geometry: GeometryProxy) -> CGFloat {
         let pixelsPerSecond = (barWidth + barSpacing) * CGFloat(Track.AMPLITUDES_PER_SECOND)
         let currentPositionOffset = CGFloat(trackAudio.currentPosition) * pixelsPerSecond

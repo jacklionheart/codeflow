@@ -1,18 +1,26 @@
-//
-//  WaveformContentView.swift
-//  loopflow
-//
-//  Created by Jack Heart on 7/2/24.
-//
-
 import SwiftUI
 
 struct WaveformContentView: View {
+    let amplitudes: [CGFloat]
+    let barWidth: CGFloat
+    let barSpacing: CGFloat
+    let scaleX: CGFloat
+    let scaleY: CGFloat
+    let fillColor: Color
+    
     var body: some View {
-        Text(/*@START_MENU_TOKEN@*/"Hello, World!"/*@END_MENU_TOKEN@*/)
+        GeometryReader { geometry in
+            Path { path in
+                for (index, amplitude) in amplitudes.enumerated() {
+                    let x = CGFloat(index) * (barWidth + barSpacing) * scaleX
+                    let height = amplitude * scaleY
+                    let y = (geometry.size.height - height) / 2
+                    
+                    path.move(to: CGPoint(x: x, y: y))
+                    path.addLine(to: CGPoint(x: x, y: y + height))
+                }
+            }
+            .stroke(fillColor, lineWidth: barWidth * scaleX)
+        }
     }
-}
-
-#Preview {
-    WaveformContentView()
 }
