@@ -15,20 +15,31 @@ class Recording : TrackAudioNode {
     // Observable properties
     private(set) var isPlaying = false
     
+    
     var currentPosition : Double {
-        if playerNode.lastRenderTime == nil {
-            return startPosition
+        if !playerNode.isPlaying || playerNode.lastRenderTime == nil {
+            return 0.0
         }
         
-        let playerTime = playerNode.playerTime(forNodeTime: playerNode.lastRenderTime!)!
+        let sampleTime = playerNode.playerTime(forNodeTime: playerNode.lastRenderTime!)!.sampleTime
         let sampleRate = track.format.sampleRate
+        let totalSecs = Double(sampleTime) / sampleRate
+        let result = totalSecs.truncatingRemainder(dividingBy: track.thaw()!.durationSeconds)
         
-        return Double(playerTime.sampleTime) / sampleRate + startPosition
+        AppLogger.audio.debug("""
+            Recording.currentPosition
+            sampleTime: \(sampleTime)
+            sampleRate: \(sampleRate)
+            totalSecs: \(totalSecs)
+            result: \(result)
+        """)
+        
+        return result
     }
     
     // Internal implementation
     private var playerNode: AVAudioPlayerNode
-    private var startPosition = 0.0
+    private var playerStartPosition  = 0.0
     private var isSegmentScheduled = false
 
     // MARK: - Methods
@@ -45,7 +56,6 @@ class Recording : TrackAudioNode {
     func stop() {
         playerNode.stop()
         isSegmentScheduled = false
-        startPosition = 0.0
         isPlaying = false
     }
     
@@ -58,33 +68,24 @@ class Recording : TrackAudioNode {
         playerNode.volume = Float(volume)
     }
     
-    func receiveNewStartSeconds(_ newStart: Double) {
-        if isPlaying && newStart > currentPosition {
-            stop()
-        }
-    }
-    
-    func receiveNewStopSeconds(_ newStop: Double) {
-        if isPlaying {
-            if newStop <= currentPosition {
-                stop()
-            }
-            if newStop > currentPosition {
-                let from = currentPosition
-                stop()
-                loop(from: from)
-            }
-        }
-    }
-    
     // Implementation
 
-    private func loop(from: Double = 0.0) {
+    private func loop() {
         let audioFile = track.audioFile
         let sampleRate = audioFile.processingFormat.sampleRate
-        let startFrame = AVAudioFramePosition((track.thaw()!.startSeconds + from) * sampleRate)
+        let startFrame = AVAudioFramePosition((track.thaw()!.startSeconds) * sampleRate)
         let totalFrames = AVAudioFramePosition(track.thaw()!.stopSeconds * sampleRate) - startFrame
-        startPosition = from
+        let totalSeconds = track.durationSeconds
+
+        AppLogger.audio.info("""
+            Looping \(self.track.name)
+            sampleRate: \(sampleRate)
+            startFrame: \(startFrame)
+            totalFrames: \(totalFrames)
+            totalSeconds: \(totalSeconds)
+            currentPosition: \(self.currentPosition)
+            currentSamples : \(self.currentPosition * sampleRate)
+        """)
         
         playerNode.scheduleSegment(audioFile, startingFrame: startFrame, frameCount: AVAudioFrameCount(totalFrames), at: nil) {
             self.loop()

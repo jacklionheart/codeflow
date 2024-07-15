@@ -7,7 +7,7 @@ struct ScrollableWaveformView: View {
     @GestureState private var dragOffset: CGFloat = 0
     
     let barWidth: CGFloat = 2
-    let barSpacing: CGFloat = 1
+    let barSpacing: CGFloat = 2
     let tickHeight: CGFloat = 20
     let labelHeight: CGFloat = 20
     

@@ -37,12 +37,6 @@ class Mix : TrackAudioNode {
         mixerNode.outputVolume = Float(volume)
     }
     
-    func receiveNewStartSeconds(_ newStart: Double) {
-    }
-    
-    func receiveNewStopSeconds(_ newStop: Double) {
-    }
-    
     // MARK: - Initialization
     
     init(_ track: Track, parent: AVAudioNode, audioEngine: AVAudioEngine) {

@@ -19,9 +19,9 @@ class Track: Object, ObjectKeyIdentifiable {
         case Mix
         case Sequence
     }
-
+    
     // MARK: Persisted values
-
+    
     @Persisted(primaryKey: true) var _id: ObjectId
     @Persisted var name = ""
     @Persisted var creationDate = Date()
@@ -30,10 +30,10 @@ class Track: Object, ObjectKeyIdentifiable {
     // Stop time (in seconds)
     @Persisted var stopSeconds = 0.0
     @Persisted var sourceDurationSeconds = 0.0
-
+    
     // Cents of pitch shift (-2400, 2400)
     @Persisted var pitchCents = 0.0
-
+    
     @Persisted var playbackRate = 1.0
     @Persisted var sourceURL = ""
     @Persisted var subtracks = RealmSwift.List<Track>()
@@ -45,6 +45,7 @@ class Track: Object, ObjectKeyIdentifiable {
     // MARK: Computed values
     
     lazy var sourceAmplitudes : [CGFloat] = computeSourceAmplitudes()
+    
     lazy var audioFile : AVAudioFile = loadAudioFile()
     
     var format: AVAudioFormat {
@@ -149,15 +150,22 @@ class Track: Object, ObjectKeyIdentifiable {
             return amplitudes
         }
         
+        let channelCount = Int(avAudioFile.processingFormat.channelCount)
+        
         for i in 0..<numberOfAmplitudes {
             do {
                 try avAudioFile.read(into: buffer)
                 
-                if let channelData = buffer.floatChannelData?[0] {
-                    var amplitude: Float = 0
-                    vDSP_maxmgv(channelData, 1, &amplitude, vDSP_Length(bufferSize))
-                    amplitudes[i] = CGFloat(amplitude) * 250 // Scale for visibility
+                var sumAmplitude: Float = 0
+                
+                for channel in 0..<channelCount {
+                    if let channelData = buffer.floatChannelData?[channel] {
+                        var amplitude: Float = 0
+                        vDSP_meamgv(channelData, 1, &amplitude, vDSP_Length(bufferSize))
+                        sumAmplitude += amplitude
+                    }
                 }
+                amplitudes[i] = CGFloat(sumAmplitude) * 250 // Scale for visibility
             } catch {
                 print("Error reading audio file: \(error)")
                 break
@@ -171,11 +179,13 @@ class Track: Object, ObjectKeyIdentifiable {
         assert(subtype == Subtype.Recording)
         
         let audioURL = Track.fileDirectory().appendingPathComponent(sourceURL)
-        AppLogger.model.debug("Track.audioFile Reading audio file from URL: \(audioURL)")
+        // TODO: This is meant to be memoized, but we end up getting new versions of the Track object
+        // so we're actually loading the audio file over and over.
+        // AppLogger.model.debug("Track.audioFile Reading audio file from URL: \(audioURL)")
         do {
             return try AVAudioFile(forReading: audioURL)
         } catch {
-            AppLogger.model.error("Track.audioFile Failed to open audio file: \(error.localizedDescription)")
+            AppLogger.model.error("Track.audioFile Failed to open audio file: \(audioURL)")
             fatalError(error.localizedDescription)
         }
     }

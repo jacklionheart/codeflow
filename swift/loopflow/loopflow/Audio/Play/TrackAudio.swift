@@ -18,8 +18,6 @@ protocol TrackAudioNode {
     func pause()
     func stop()
     func receiveNewVolume(_ volume : Double)
-    func receiveNewStartSeconds(_ newStart: Double)
-    func receiveNewStopSeconds(_ newStop: Double)
 }
 
 
@@ -64,6 +62,7 @@ class TrackAudio : ObservableObject {
     public func stop() {
         inputNode.stop()
         stopPositionUpdates()
+        currentPosition = 0.0
         isPlaying = false
     }
     
@@ -102,22 +101,13 @@ class TrackAudio : ObservableObject {
                         }
                     }
                     
-                    if property.name == "startSeconds", let newValue = property.newValue as? Double {
-                        // Update the published pitchCents when the property changes
+                    if property.name == "startSeconds" || property.name == "stopSeconds" {
                         DispatchQueue.main.async {
-                            self!.inputNode.receiveNewStartSeconds(newValue)
-                        }
-                    }
-                    
-                    if property.name == "stopSeconds", let newValue = property.newValue as? Double {
-                        // Update the published pitchCents when the property changes
-                        DispatchQueue.main.async {
-                            self!.inputNode.receiveNewStopSeconds(newValue)
+                            self!.stop()
                         }
                     }
                     
                     if property.name == "volume", let newValue = property.newValue as? Double {
-                        // Update the published pitchCents when the property changes
                         DispatchQueue.main.async {
                             self!.inputNode.receiveNewVolume(newValue)
                         }
@@ -201,7 +191,6 @@ class TrackAudio : ObservableObject {
         // Connect nodes in a bottom up order
         audioEngine.connect(timePitchNode, to: parent, format: track.format)
         
-        forwardTrackChanges()
         subscribeToTrackChanges()
     }
     

@@ -24,9 +24,14 @@ class Audio : ObservableObject {
         do {
             let audioSession = AVAudioSession.sharedInstance()
             try audioSession.setCategory(.playAndRecord, mode: .default)
+            try audioSession.setPreferredSampleRate(44100)
+            try audioSession.setPreferredIOBufferDuration(0.005)
             try audioSession.setActive(true)
-            try audioSession.setInputGain(1.0)
+            try audioSession.setInputGain(1.5)
             AppLogger.model.info("audio.init Active audio session")
+            print("inputFormat: \(audioEngine.inputNode.inputFormat(forBus: 0))")
+            print("outputFormat: \(audioEngine.inputNode.outputFormat(forBus: 0))")
+
         } catch {
             AppLogger.audio.error("audio.init Failed to set up audio session: \(error.localizedDescription)")
         }
@@ -36,6 +41,9 @@ class Audio : ObservableObject {
             // the engine has the mainMixerNode -> mainOutputNode graph.
             audioEngine.mainMixerNode.outputVolume = 1.0
             try audioEngine.start()
+            print("after startung inputFormat: \(audioEngine.inputNode.inputFormat(forBus: 0))")
+            print("after starting outputFormat: \(audioEngine.inputNode.outputFormat(forBus: 0))")
+
             AppLogger.model.info("audio.init audio engine start successful")
         }
         catch {

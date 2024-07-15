@@ -7,8 +7,8 @@ struct RecorderView: View {
     var body: some View {
         VStack {
             Spacer()
-           // WaveformView(waveform: recorder.waveform)
             if (recorder.active) {
+                PitchDisplayView(pitch: recorder.currentPitch)
                 Text(recorder.name).bold()
                 Text(Format.duration(recorder.elapsedTime)).font(.headline)
             }
