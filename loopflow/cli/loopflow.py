@@ -12,10 +12,10 @@ import yaml
 import click
 from typing import Optional, Dict, Any
 
-from .prompt import Prompt
-from .llm import LLMProvider, Anthropic, LLM
-from .session import Session, User
-from .templates import load_all_teammates
+from loopflow.prompt import Prompt
+from loopflow.llm import LLMProvider, Anthropic, LLM
+from loopflow.session import Session, User
+from loopflow.templates import load_all_teammates
 
 class ConfigError(Exception):
     """Exception raised for configuration errors."""

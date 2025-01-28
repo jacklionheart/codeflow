@@ -13,11 +13,11 @@ dependencies = [
     "anthropic>=0.18.0",
     "openai>=1.12.0",
     "aiohttp>=3.9.0",
-    "code-context>=0.1.0"
 ]
 
 [project.scripts]
-loopflow = "loopflow.cli:cli"
+loopflow = "loopflow.cli.loopflow:cli"
+code-context = "loopflow.cli.code_context:cli"
 
 [tool.hatch.build.targets.wheel]
 packages = ["loopflow"]

@@ -276,8 +276,8 @@ class Synthesize(Job):
     
     async def execute(self, context: Context) -> Context:
         try:
-            # Pick synthesizer (prefer 'kaito' if available)
-            synthesizer_name = "kaito"
+            # Pick synthesizer (prefer 'maya' if available)
+            synthesizer_name = "maya"
             if synthesizer_name not in context.team.llms:
                 synthesizer_name = next(iter(context.team.llms.keys()))
             synthesizer = context.team.llms[synthesizer_name]
