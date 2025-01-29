@@ -5,6 +5,7 @@ from typing import Dict, Any
 
 from loopflow.team import Team, MateConfig, MateError
 from loopflow.llm import LLM
+from tests.mock import MockProvider
 
 @pytest.fixture
 def mock_llm_factory():
@@ -24,7 +25,7 @@ def mock_llms(mock_llm_factory):
 @pytest.fixture
 def team(mock_llms):
     """Create a Team instance with mock LLMs."""
-    return Team(mock_llms)
+    return Team(MockProvider(), mock_llms)
 
 @pytest.fixture
 def mate_file_content():
@@ -119,6 +120,6 @@ More content
 @pytest.mark.asyncio
 async def test_team_empty_mates():
     """Test team behavior with no mates."""
-    team = Team({})
+    team = Team(MockProvider(), {})
     result = await team.query_parallel("Test", {})
     assert result == {}, "Empty team should return empty results"

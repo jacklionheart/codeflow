@@ -20,7 +20,7 @@ def create_test_codebase(tmp_path):
     """
     return lambda files: _create_files(tmp_path, files)
 
-def test_basic_context_loading(create_test_codebase, monkeypatch):
+def test_basic_state_loading(create_test_codebase, monkeypatch):
     """Test basic context file loading."""
     root = create_test_codebase({
         "manabot/manabot/main.py": "print('hello')",
@@ -112,10 +112,9 @@ def test_auto_prefixed_path_resolution(create_test_codebase, monkeypatch):
         "manabot/README.md": "# Prefixed Structure"
     })
     
-    monkeypatch.setenv("CODE_CONTEXT_ROOT", str(root))
-    
-    content = get_context(["manabot/env"])
-    
+    content = get_context(["manabot/env"], root=root)
+    print(content)
+  
     assert "config.py" in content
     assert "# Prefixed Structure" in content
 
@@ -260,3 +259,153 @@ def test_document_indexing(create_test_codebase, monkeypatch):
             is_readme = False
     
     assert all(r < n for r in readme_indices for n in non_readme_indices)
+
+def test_idempotency(tmp_path):
+    """Test that calling resolve_codebase_path multiple times gives same result."""
+    # Set up test paths
+    root = tmp_path / "root"
+    project = root / "myproject"
+    project.mkdir(parents=True)
+    
+    # First resolution - relative path
+    path1 = resolve_codebase_path("myproject/file.txt", root=root)
+    assert path1.is_absolute()
+    
+    # Second resolution - using result of first resolution
+    path2 = resolve_codebase_path(path1, root=root)
+    assert path1 == path2
+    
+    # Third resolution - just to be thorough
+    path3 = resolve_codebase_path(path2, root=root)
+    assert path1 == path3
+
+def test_absolute_paths_unchanged(tmp_path):
+    """Test that absolute paths are returned unchanged except for resolving."""
+    root = tmp_path / "root"
+    abs_path = root / "project" / "file.txt"
+    
+    result = resolve_codebase_path(abs_path, root=root)
+    assert result == abs_path.resolve()
+
+def test_doubled_path_detection(tmp_path):
+    """Test that doubled project paths are detected correctly."""
+    # Set up test structure:
+    # root/
+    #   project/
+    #     project/  <- This is where files should be found
+    #       src/
+    #         file.txt
+    root = tmp_path / "root"
+    nested = root / "project" / "project" / "src"
+    nested.mkdir(parents=True)
+    test_file = nested / "file.txt"
+    test_file.touch()
+    
+    # Test resolution of a project file
+    result = resolve_codebase_path("project/src/file.txt", root=root)
+    assert result == (root / "project" / "project" / "src" / "file.txt").resolve()
+
+def test_direct_path_preference(tmp_path):
+    """Test that direct paths are preferred when they exist."""
+    # Set up both direct and doubled paths:
+    # root/
+    #   project/
+    #     file.txt  <- This should be preferred
+    #   project/
+    #     project/
+    #       file.txt
+    root = tmp_path / "root"
+    direct = root / "project"
+    doubled = root / "project" / "project"
+    direct.mkdir(parents=True)
+    doubled.mkdir(parents=True)
+    
+    direct_file = direct / "file.txt"
+    doubled_file = doubled / "file.txt"
+    direct_file.touch()
+    doubled_file.touch()
+    
+    result = resolve_codebase_path("project/file.txt", root=root)
+    assert result == direct_file.resolve()
+
+def test_for_reading_vs_writing(tmp_path):
+    """Test different behavior for reading vs writing paths."""
+    root = tmp_path / "root"
+    project = root / "project" / "project"
+    project.mkdir(parents=True)
+    
+    # For reading - file must exist
+    read_result = resolve_codebase_path(
+        "project/nonexistent.txt", 
+        root=root, 
+        for_reading=True
+    )
+    assert read_result == (root / "project" / "nonexistent.txt").resolve()
+    
+    # For writing - only parent directory must exist
+    write_result = resolve_codebase_path(
+        "project/newfile.txt", 
+        root=root, 
+        for_reading=False
+    )
+    assert write_result == (root / "project" / "project" / "newfile.txt").resolve()
+
+def test_symlinks_resolution(tmp_path):
+    """Test that symlinks are handled correctly."""
+    # Set up structure with symlinks
+    root = tmp_path / "root"
+    actual = root / "actual"
+    link = root / "link"
+    
+    # Create the actual directory first
+    actual.mkdir(parents=True)
+    test_file = actual / "file.txt"
+    test_file.write_text("test content")
+    
+    # Create symlink in correct direction: link -> actual
+    link.symlink_to(actual, target_is_directory=True)
+    
+    # Resolution through symlink should give us the real path
+    result = resolve_codebase_path("link/file.txt", root=root)
+    assert result == test_file.resolve()
+
+
+def test_path_types(tmp_path):
+    """Test that both string and Path inputs work correctly."""
+    root = tmp_path / "root"
+    project = root / "project"
+    project.mkdir(parents=True)
+    
+    # Test with string
+    str_result = resolve_codebase_path("project/file.txt", root=root)
+    assert isinstance(str_result, Path)
+    assert str_result.is_absolute()
+    
+    # Test with Path
+    path_result = resolve_codebase_path(Path("project/file.txt"), root=root)
+    assert isinstance(path_result, Path)
+    assert path_result.is_absolute()
+    
+    # Results should be the same
+    assert str_result == path_result
+
+def test_edge_cases(tmp_path):
+    """Test various edge cases and corner conditions."""
+    root = tmp_path / "root"
+    root.mkdir(parents=True)
+    
+    # Empty path
+    empty_result = resolve_codebase_path("", root=root)
+    assert empty_result == root.resolve()
+    
+    # Current directory
+    dot_result = resolve_codebase_path(".", root=root)
+    assert dot_result == root.resolve()
+    
+    # Parent directory
+    parent_result = resolve_codebase_path("..", root=root)
+    assert parent_result == root.resolve().parent
+    
+    # Multiple slashes
+    slashes_result = resolve_codebase_path("project//file.txt", root=root)
+    assert slashes_result == (root / "project" / "file.txt").resolve()

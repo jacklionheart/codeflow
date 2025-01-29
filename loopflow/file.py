@@ -10,6 +10,9 @@ from pathlib import Path
 from typing import List, Set, Optional, Tuple, Union
 from fnmatch import fnmatch
 from dataclasses import dataclass
+import logging 
+
+logger = logging.getLogger("loopflow.file")
 
 @dataclass
 class Document:
@@ -34,6 +37,8 @@ def resolve_codebase_path(
     2. Try doubled path (project/project/rest) if direct doesn't exist
     3. Return direct path if neither exists
     
+    All returned paths are guaranteed to be absolute.
+    
     Args:
         path_str: Path to resolve
         root: Root directory (defaults to get_code_context_root())
@@ -44,27 +49,31 @@ def resolve_codebase_path(
 
     path_obj = Path(str(path_str))
     if path_obj.is_absolute():
-        return path_obj
+        return path_obj.resolve()
 
     dirpath = path_obj.parent
     filename = path_obj.name
-    direct_path = root / path_obj
+    direct_path = (root / path_obj).resolve()
 
     if len(dirpath.parts) > 0:
-        doubled_path = root / dirpath.parts[0] / dirpath.parts[0] / Path(*dirpath.parts[1:]) / filename
+        doubled_path = (root / dirpath.parts[0] / dirpath.parts[0] / Path(*dirpath.parts[1:]) / filename).resolve()
     else:
         doubled_path = direct_path
 
     if for_reading:
         direct_exists = direct_path.exists()
         doubled_exists = doubled_path.exists()
+        result = direct_path 
+        if doubled_exists and not direct_exists:
+            result = doubled_path
+        return result
     else:
-        direct_exists = direct_path.parent.exists()
         doubled_exists = doubled_path.parent.exists()
-
-    if doubled_exists and not direct_exists:
-        return doubled_path
-    return direct_path
+        if doubled_exists:
+            result = doubled_path
+        else:
+            result = direct_path
+        return result
 
 def _find_parent_readmes(path: Path) -> List[Path]:
     """Find all README.md files from given path up to CODE_CONTEXT_ROOT."""
@@ -218,7 +227,7 @@ def _format_document(doc: Document, raw: bool) -> str:
     return "\n".join(lines)
 
 def get_context(
-    paths: List[str],
+    paths: Optional[List[str]],
     raw: bool = False,
     extensions: Optional[Tuple[str, ...]] = None,
     root: Optional[Path] = None
@@ -227,13 +236,17 @@ def get_context(
     Load and format context from specified paths.
     
     Args:
-        paths: List of paths to load context from
+        paths: List of paths to load context from, or None for no context
         raw: Whether to use raw format instead of XML
         extensions: Optional tuple of file extensions to filter
         root: Optional root directory (defaults to CODE_CONTEXT_ROOT)
     """
     if root is None:
         root = get_code_context_root()
+
+    # Handle empty paths
+    if not paths:
+        return "" if raw else "<documents></documents>"
 
     processed_files: Set[str] = set()
     documents = []
@@ -243,7 +256,7 @@ def get_context(
         try:
             path = resolve_codebase_path(path_str, root, for_reading=True)
             if not path.exists():
-                print(f"Warning: Path does not exist: {path}")
+                logger.warning(f"Path does not exist: {path}")
                 continue
 
             # Process parent READMEs first

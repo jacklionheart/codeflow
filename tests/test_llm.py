@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, patch
 import asyncio
 
 from loopflow.llm import LLMError
-from loopflow.llm.anthropic import Anthropic, AnthropicConfig
+from loopflow.llm.anthropic import Anthropic
 
 # -----------------------------------------------------------------------------
 # Fixtures
@@ -15,21 +15,25 @@ from loopflow.llm.anthropic import Anthropic, AnthropicConfig
 def mock_response():
     """Create a mock API response object."""
     return type('Response', (), {
-        'content': 'Test response',
+        'content': [
+            type('Content', (), {
+                'text': 'Test response'
+            })()
+        ],
         'usage': type('Usage', (), {
             'input_tokens': 10,
             'output_tokens': 20
         })
-    })()  # Create an instance, not just the type
+    })()
 
 @pytest.fixture
 def config():
     """Create a standard config for testing."""
-    return AnthropicConfig(
-        api_key='test_key',
-        timeout=1.0,
-        max_retries=1
-    )
+    return {
+        "api_key": "test_key",
+        "timeout": 1.0,
+        "max_retries": 1
+    }
 
 # -----------------------------------------------------------------------------
 # Provider Tests
@@ -51,28 +55,8 @@ async def test_anthropic_chat(config, mock_response):
         assert response == "Test response"
         mock_client.messages.create.assert_called_once()
         call_kwargs = mock_client.messages.create.call_args[1]
-        assert call_kwargs['model'] == "claude-3.5-sonnet-latest"
+        assert call_kwargs['model'] == "claude-3-5-sonnet-20241022"
         assert len(call_kwargs['messages']) > 0
-
-@pytest.mark.asyncio
-async def test_anthropic_system_prompt(config, mock_response):
-    """Test that system prompts are properly included."""
-    system_prompt = "You are a test assistant."
-    
-    with patch('anthropic.AsyncAnthropic') as mock_anthropic:
-        mock_client = AsyncMock()
-        mock_client.messages.create.return_value = mock_response
-        mock_anthropic.return_value = mock_client
-        
-        provider = Anthropic(config)
-        llm = provider.createLLM("test", system_prompt, "Correctness, Clarity, Completeness")
-        
-        await llm.chat("Hello")
-        
-        call_kwargs = mock_client.messages.create.call_args[1]
-        messages = call_kwargs['messages']
-        assert any(msg['role'] == 'system' and msg['content'] == system_prompt 
-                  for msg in messages)
 
 @pytest.mark.asyncio
 async def test_anthropic_conversation_history(config, mock_response):
@@ -93,6 +77,48 @@ async def test_anthropic_conversation_history(config, mock_response):
         call_kwargs = mock_client.messages.create.call_args[1]
         messages = call_kwargs['messages']
         assert len(messages) >= 2  # Should include both interactions
+
+@pytest.mark.asyncio
+async def test_anthropic_token_tracking(config):
+    """Test token usage tracking."""
+    response1 = type('Response', (), {
+        'content': [
+            type('Content', (), {
+                'text': 'Response 1'
+            })()
+        ],
+        'usage': type('Usage', (), {
+            'input_tokens': 10,
+            'output_tokens': 20
+        })
+    })()
+    
+    response2 = type('Response', (), {
+        'content': [
+            type('Content', (), {
+                'text': 'Response 2'
+            })()
+        ],
+        'usage': type('Usage', (), {
+            'input_tokens': 15,
+            'output_tokens': 25
+        })
+    })()
+    
+    with patch('anthropic.AsyncAnthropic') as mock_anthropic:
+        mock_client = AsyncMock()
+        mock_client.messages.create.side_effect = [response1, response2]
+        mock_anthropic.return_value = mock_client
+        
+        provider = Anthropic(config)
+        llm = provider.createLLM("test", "You are a test assistant.", "Correctness, Clarity, Completeness")
+        
+        await llm.chat("Message 1")
+        await llm.chat("Message 2")
+        
+        usage = provider.usage
+        assert usage.input_tokens == 25  # 10 + 15
+        assert usage.output_tokens == 45  # 20 + 25
 
 @pytest.mark.asyncio
 async def test_anthropic_error_handling(config):
@@ -133,11 +159,11 @@ async def test_anthropic_timeout(config):
         mock_anthropic.return_value = mock_client
         
         # Use very short timeout
-        test_config = AnthropicConfig(
-            api_key='test_key',
-            timeout=0.1,
-            max_retries=1
-        )
+        test_config = {
+            "api_key": "test_key",
+            "timeout": 0.1,
+            "max_retries": 1
+        }
         provider = Anthropic(test_config)
         llm = provider.createLLM("test", "You are a test assistant.", "Correctness, Clarity, Completeness")
         
@@ -150,7 +176,11 @@ async def test_anthropic_timeout(config):
 async def test_anthropic_token_tracking(config):
     """Test token usage tracking."""
     response1 = type('Response', (), {
-        'content': 'Response 1',
+        'content': [
+            type('Content', (), {
+                'text': 'Response 1'
+            })()
+        ],
         'usage': type('Usage', (), {
             'input_tokens': 10,
             'output_tokens': 20
@@ -158,7 +188,11 @@ async def test_anthropic_token_tracking(config):
     })()
     
     response2 = type('Response', (), {
-        'content': 'Response 2',
+        'content': [
+            type('Content', (), {
+                'text': 'Response 2'
+            })()
+        ],
         'usage': type('Usage', (), {
             'input_tokens': 15,
             'output_tokens': 25

@@ -4,11 +4,10 @@ import asyncio
 from pathlib import Path
 import tempfile
 import pytest
-from unittest.mock import AsyncMock
 
 from loopflow.session import Session, SessionError
-from loopflow.workflow import Sequential, Context, Job
-from .mock import MockLLM, MockUser
+from loopflow.workflow import Job, WorkflowState
+from .mock import MockUser
 
 # -----------------------------------------------------------------------------
 # Fixtures
@@ -53,7 +52,7 @@ def basic_session(mock_user, mock_provider):
 async def test_session_timeout(basic_session, basic_prompt):
     """Test timeout handling with real async delay."""
     class SlowJob(Job):
-        async def execute(self, context: Context) -> Context:
+        async def execute(self, context: WorkflowState) -> WorkflowState:
             await asyncio.sleep(0.2)  # Longer than timeout
             return context
     
@@ -91,7 +90,7 @@ async def test_session_error_handling(basic_session, basic_prompt):
     
     # Create an error-raising job
     class ErrorJob(Job):
-        async def execute(self, context: Context) -> Context:
+        async def execute(self, context: WorkflowState) -> WorkflowState:
             raise Exception(error_msg)
     
     # Override the pipeline to use our error job

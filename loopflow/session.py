@@ -14,9 +14,13 @@ from pathlib import Path
 from typing import Dict, Optional, Any, Set
 
 from .prompt import Prompt
-from .workflow import default_pipeline, Job, Context
+from .workflow import default_pipeline, Job, WorkflowState
 from .llm import LLMProvider, LLM
 from .team import Team
+import logging
+
+# Configure logging with a specific format for loopflow
+logger = logging.getLogger("loopflow")
 
 class SessionError(Exception):
     """
@@ -34,14 +38,18 @@ class User:
     Represents the human user interacting with the session.
     """
     def __init__(self, name: str = "user"):
-        self.name = name
+        self.logger = logging.getLogger("loopflow.user")
 
     async def chat(self, prompt: str) -> str:
         """
         Chat with the user and return their response.
         """
+        self.logger.info("Requesting user input")
+        self.logger.debug("User prompt: %s", prompt)
         print("\n" + prompt + "\n")
-        return input("Your response: ")
+        response = input("Your response: ")
+        self.logger.debug("User response: %s", response)
+        return response
 
 class Session:
     """
@@ -74,12 +82,16 @@ class Session:
         self.timeout = timeout
         self.available_llms = available_llms
         self.pipeline = pipeline or default_pipeline()
+        self.logger = logging.getLogger("loopflow.session")
 
         self.start_time: Optional[datetime] = None
         self.end_time: Optional[datetime] = None
         self._temp_dir: Optional[Path] = None
         
         assert(len(self.available_llms) > 0)
+        self.logger.info("Session initialized with %d LLMs", len(self.available_llms))
+        self.logger.debug("Available LLMs: %s", list(self.available_llms.keys()))
+
     
     async def run(self, prompt: Prompt) -> Dict[str, Any]:
         """
@@ -99,29 +111,40 @@ class Session:
             SessionError: If execution fails
         """
         self.start_time = datetime.now()
-        
+        self.logger.info("Starting session execution")
+        self.logger.info("Goal: %s", prompt.goal)
+        self.logger.debug("Output files: %s", prompt.output_files)
+        if prompt.context_files:
+            self.logger.debug("Context files: %s", prompt.context_files)
+  
         try:
-            # Set up team based on prompt reviewers
-            team = self._setup_team(prompt.reviewers)
+            # Set up team based on prompt team
+            team = self._setup_team(prompt.team)
+            self.logger.info("Team setup complete with %d members", len(team.llms))
             
             # Create initial context with team and other required state
-            context = Context(
+            state = WorkflowState(
                 prompt=prompt,
                 team=team
             )
-            context.user = self.user
+            state.user = self.user
             
             async with asyncio.timeout(self.timeout):
-                final_context = await self.pipeline.execute(context)
+                final_context = await self.pipeline.execute(state)
             
             self.end_time = datetime.now()
+            duration = (self.end_time - self.start_time).total_seconds()
+            self.logger.info("Pipeline execution completed in %.2f seconds", duration)
             
             # Write outputs atomically
             await self._write_outputs(final_context.outputs)
+            self.logger.info("Output files written successfully")
             
             # Create and return final result
-            return self._create_result(final_context)
-
+            result = self._create_result(final_context)
+            self.logger.info("Session completed successfully")
+            self.logger.info("Total cost: $%.4f", self.provider.usage.totalCostUsd())
+            return result
 
         except Exception as e:
             error_message = str(e)
@@ -129,47 +152,52 @@ class Session:
                 error_message = "TimeoutError"
             
             self.end_time = datetime.now()
+            duration = (self.end_time - self.start_time).total_seconds()
+            self.logger.error("Session failed after %.2f seconds: %s", duration, error_message)
             
             # Create error result with available metrics
             error_result = {
                 "status": "error",
                 "error": error_message,
-                "execution_time": (self.end_time - self.start_time).total_seconds(),
+                "execution_time": duration,
                 "usage": self.provider.usage
             }
             
             # Re-raise with original message and context
             raise SessionError(error_message, error_result)
 
-    def _setup_team(self, reviewers: Set[str]) -> Team:
+    def _setup_team(self, team: Set[str]) -> Team:
         """
-        Create model instances for requested reviewers.
+        Create model instances for requested team.
         
         Args:
-            reviewers: Set of team members to include in the session
+            team: Set of team members to include in the session
             
         Returns:
-            Team instance with requested reviewers
+            Team instance with requested team
             
         Raises:
             SessionError: If any requested team member isn't configured
         """
+        self.logger.debug("Setting up team with members: %s", team)
         llms = {}
         missing = []
         
-        for name in reviewers:
+        for name in team:
             if name not in self.available_llms:
                 missing.append(name)
                 continue
             llms[name] = self.available_llms[name]
                         
         if missing:
+            self.logger.error("Unknown team members requested: %s", missing)
+            self.logger.error("Available team members: %s", list(self.available_llms.keys()))
             raise SessionError(
-                f"Unknown team members: {', '.join(missing)} requested: {list(reviewers)}, available: {list(self.available_llms.keys())}",
+                f"Unknown team members: {', '.join(missing)} requested: {list(team)}, available: {list(self.available_llms.keys())}",
                 {}
             )
             
-        return Team(llms)
+        return Team(self.provider, llms)
     
     async def _write_outputs(self, outputs: Dict[str, str]) -> None:
         """
@@ -181,12 +209,14 @@ class Session:
         Raises:
             SessionError: If file operations fail
         """
+        self.logger.info("Writing %d output files", len(outputs))
         temp_files = {}
         
         try:
             # Create temporary directory if needed
             if not self._temp_dir:
                 self._temp_dir = Path(tempfile.mkdtemp())
+                self.logger.debug("Created temp directory: %s", self._temp_dir)
             
             # First write all files to temporary locations
             for path, content in outputs.items():
@@ -196,17 +226,21 @@ class Session:
                 temp_path.parent.mkdir(parents=True, exist_ok=True)
                 temp_path.write_text(content)
                 temp_files[path] = temp_path
+                self.logger.debug("Wrote temporary file: %s", temp_path)
             
             # Then atomically move all files to their final locations
             for final_path, temp_path in temp_files.items():
                 final_path.parent.mkdir(parents=True, exist_ok=True)
                 shutil.move(str(temp_path), str(final_path))
+                self.logger.debug("Moved file to final location: %s", final_path)
                 
         except Exception as e:
             # Clean up any temporary files
+            self.logger.error("Failed to write outputs: %s", e)
             for temp_path in temp_files.values():
                 if temp_path.exists():
                     temp_path.unlink()
+                    self.logger.debug("Cleaned up temporary file: %s", temp_path)
             
             raise SessionError(
                 f"Failed to write outputs: {e}",
@@ -224,7 +258,7 @@ class Session:
         Returns:
             Dictionary containing execution results and metrics
         """
-        return {
+        result = {
             "status": "success",
             "outputs": context.outputs,
             "execution_time": (self.end_time - self.start_time).total_seconds(),
@@ -236,3 +270,6 @@ class Session:
             },
             "usage": self.provider.usage
         }
+        
+        self.logger.debug("Session results: %s", result)
+        return result

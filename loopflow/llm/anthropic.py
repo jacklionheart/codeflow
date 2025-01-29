@@ -9,36 +9,28 @@ from dataclasses import dataclass
 from typing import List, Dict, Tuple
 import asyncio
 import anthropic
+from typing import Any
 
 from .llm import LLMProvider, LLM, UsageStats, LLMError
-
-@dataclass
-class AnthropicConfig:
-    """
-    Configuration for Anthropic's API.
-    
-    Attributes:
-        api_key: Authentication key for Anthropic's API
-        timeout: Maximum seconds to wait for responses
-        max_retries: Number of retry attempts for failed requests
-    """
-    api_key: str
-    timeout: float = 30.0
-    max_retries: int = 3
 
 class Anthropic(LLMProvider):
     """Provider implementation for Anthropic's API."""
     
-    def __init__(self, config: AnthropicConfig):
+    def __init__(self, config: Dict[str, Any]):
         """Initialize the Anthropic provider."""
         self.config = config
         self.usage = UsageStats(0, 0)
+
+        print(f"Initializing Anthropic provider with API key: {config}")
         
         self.client = anthropic.AsyncAnthropic(
-            api_key=config.api_key,
-            timeout=config.timeout,
-            max_retries=config.max_retries
+            api_key=config["api_key"],
+            timeout=config.get("timeout", 600.0),
+            max_retries=config.get("max_retries", 3)
         )
+
+        print(f"Anthropic client initialized with API key: {config}")
+
     
     def createLLM(self, name: str, system_prompt: str, priorities: str) -> LLM:
         """Create a new model instance."""
@@ -73,24 +65,22 @@ class Claude(LLM):
             LLMError: If the API call fails, with context-specific suggestions
         """
         try:
-            # Claude's API is stateless; we rebuild the history each message
+            # Build message history without system prompt
             messages = []
-            if self.system_prompt:
-                messages.append({"role": "system", "content": self.system_prompt})
-
             for interaction in self.history:
                 messages.append({"role": "user", "content": interaction.prompt})
                 messages.append({"role": "assistant", "content": interaction.response})
             messages.append({"role": "user", "content": prompt})
             
-            # Make the API request
+            # Make the API request with system as a top-level parameter
             response = await self.anthropic.client.messages.create(
-                model="claude-3.5-sonnet-latest",
+                model="claude-3-5-sonnet-20241022",
+                system=self.system_prompt if self.system_prompt else None,
                 messages=messages,
                 max_tokens=4096
             )
                         
-            return response.content, response.usage.input_tokens, response.usage.output_tokens
+            return response.content[0].text, response.usage.input_tokens, response.usage.output_tokens
             
         except Exception as e:
             error_msg = str(e).lower()

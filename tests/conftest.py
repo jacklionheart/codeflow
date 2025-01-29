@@ -13,7 +13,7 @@ def basic_prompt(tmp_path: Path):
     return Prompt(
         goal="Build a simple test function",
         output_files=[tmp_path / "test_func.py"],
-        reviewers=["reviewer1", "reviewer2"],
+        team=["reviewer1", "reviewer2"],
         context_files=None
     )
 
@@ -33,7 +33,7 @@ def valid_prompt_content():
         ## Context
         src/lib
 
-        ## Reviewers
+        ## Team
         - reviewer1
         - reviewer2
     """).lstrip()

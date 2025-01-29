@@ -7,15 +7,16 @@ review, and synthesis), and can be composed into pipelines for execution.
 """
 
 import asyncio
+import logging
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Any, Optional, Set
+from typing import Dict, List, Any
 
 from .prompt import Prompt
-from .llm import LLM
 from .team import Team    
+from .file import get_context
 from .templates import (
     QUESTION_TEMPLATE,
     DRAFT_TEMPLATE,
@@ -24,8 +25,9 @@ from .templates import (
 )
 
 class WorkflowError(Exception):
-    """Base error for workflow failures with context."""
+    """Base error for workflow failures with state."""
     def __init__(self, message: str, context: Dict[str, Any]):
+        self.message = message
         self.context = context
         super().__init__(message)
 
@@ -45,15 +47,15 @@ async def with_retries(func, max_retries=3):
             await asyncio.sleep(2 ** attempt)
 
 # -----------------------------------------------------------------------------
-# Context
+# WorkflowState
 # -----------------------------------------------------------------------------
 
 @dataclass
-class Context:
+class WorkflowState:
     """
-    The shared context passed between pipeline jobs.
+    The shared state passed between pipeline jobs.
     
-    The Context maintains all state accumulated during workflow execution,
+    The WorkflowState maintains all state accumulated during workflow execution,
     from the initial prompt through to final outputs. This includes all
     intermediate artifacts like clarifications, drafts, and reviews.
     """
@@ -91,20 +93,20 @@ class Job(ABC):
     Base class for all pipeline jobs.
     
     A Job represents a distinct phase in the generation process. Each job
-    takes a Context as input, performs some work (possibly involving LLM
-    interactions or user input), and returns an updated Context.
+    takes a WorkflowState as input, performs some work (possibly involving LLM
+    interactions or user input), and returns an updated WorkflowState.
     """
 
     @abstractmethod
-    async def execute(self, context: Context) -> Context:
+    async def execute(self, state: WorkflowState) -> WorkflowState:
         """
-        Execute this job's work and return updated context.
+        Execute this job's work and return updated state.
         
         Args:
-            context: The current workflow context
+            state: The current workflow state
             
         Returns:
-            Updated context with this job's results
+            Updated state with this job's results
             
         Raises:
             WorkflowError: If job execution fails
@@ -116,206 +118,350 @@ class Job(ABC):
 # -----------------------------------------------------------------------------
 
 class Clarify(Job):
-    """
-    Job that handles requirement clarification through model interaction.
-    
-    The Clarify job has models ask questions about the requirements and
-    collects answers from the user. This helps ensure alignment before
-    generation begins.
-    """
-    
-    async def execute(self, context: Context) -> Context:
+    async def execute(self, state: WorkflowState) -> WorkflowState:
+        logger = logging.getLogger("loopflow.workflow.clarify")
+        logger.info("Starting clarification phase")
+        start_time = datetime.now()
+        
         try:
-            # Gather questions from all models, customizing priorities per teammate
-            questions = await context.team.query_parallel(
+            # Log initial state
+            logger.info("Initial state:")
+            logger.info("  Goal: %s", state.prompt.goal)
+            logger.info("  Team members: %s", list(state.team.llms.keys()))
+            logger.info("  Output files: %s", [str(p) for p in state.prompt.output_files])
+            
+            # Gather questions from all models
+            questions = await state.team.query_parallel(
                 QUESTION_TEMPLATE,
                 {
-                    "goal": context.prompt.goal,
-                    "file_paths": "\n".join(str(p) for p in context.prompt.output_files),
-                    "context": "\n".join(str(p) for p in (context.prompt.context_files or [])),
-                    "priorities": lambda name: context.team.get_teammate_priorities(name)
+                    "goal": state.prompt.goal,
+                    "file_paths": "\n".join(str(p) for p in state.prompt.output_files),
+                    "context": get_context(state.prompt.context_files),
+                    "priorities": lambda name: state.team.priorities(name)
                 }
             )
-
-            # Format questions for user
+            
+            logger.info("Received questions from team members:")
+            for name, q in questions.items():
+                logger.info("  %s's questions (%d chars):\n%s", name, len(q), q)
+            
+            # Format and get user response
             questions_str = "\n\n".join(
                 f"{name}'s Questions:\n{q}" 
                 for name, q in questions.items()
             )
-            context.log_step("questions", {"questions": questions})
-
-            # Get user answers
-            user_answers = await context.user.chat(questions_str)
-            context.log_step("answers", {"answers": user_answers})
+            
+            user_answers = await state.user.chat(questions_str)
+            logger.info("Received user answers (%d chars):\n%s", len(user_answers), user_answers)
             
             # Store Q&A pairs
-            context.clarifications = {
+            state.clarifications = {
                 "questions": questions_str,
                 "answers": user_answers
             }
+            logger.info("Stored clarifications in state")
             
-            return context
+            duration = (datetime.now() - start_time).total_seconds()
+            cost = state.team.provider.usage.totalCostUsd()
+            logger.info("Clarification complete - Duration: %.2f seconds, Cost: $%.4f", 
+                       duration, cost)
+            
+            return state
             
         except Exception as e:
+            logger.error("Clarification failed: %s", str(e), exc_info=True)
             raise WorkflowError("Clarification failed", {
                 "error": str(e),
                 "stage": "clarify"
             })
 
 class Draft(Job):
-    """
-    Job that generates initial code drafts for each file using all models.
-    
-    The Draft job has each model generate initial implementations for all
-    required files. These drafts serve as the starting point for review
-    and iteration.
-    """
-    
-    async def execute(self, context: Context) -> Context:
+    async def execute(self, state: WorkflowState) -> WorkflowState:
+        logger = logging.getLogger("loopflow.workflow.draft")
+        logger.info("Starting draft generation phase")
+        start_time = datetime.now()
+        
         try:
-            prompt_data = context.prompt
+            prompt_data = state.prompt
+            logger.info("Processing prompt:")
+            logger.info("  Goal: %s", prompt_data.goal)
+            logger.info("  Output files: %s", [str(p) for p in prompt_data.output_files])
             
             # Format clarification dialogue
             clar_text = (
-                f"Questions:\n{context.clarifications['questions']}\n\n"
-                f"Answers:\n{context.clarifications['answers']}"
-                if context.clarifications
+                f"Questions:\n{state.clarifications['questions']}\n\n"
+                f"Answers:\n{state.clarifications['answers']}"
+                if state.clarifications
                 else ""
             )
+            logger.debug("Using clarification text (%d chars)", len(clar_text))
             
-            # Initialize draft storage for each author
-            for name in context.team.llms:
-                context.drafts[name] = {}
+            # Initialize draft storage
+            for name in state.team.llms:
+                state.drafts[name] = {}
+                logger.info("Initialized draft storage for %s", name)
 
             # Generate drafts for each output file
             for file_path in prompt_data.output_files:
-                # Query all models in parallel for a draft
-                responses = await context.team.query_parallel(
-                    DRAFT_TEMPLATE,
-                    {
-                        "goal": prompt_data.goal,
-                        "file_path": str(file_path),
-                        "clarification_dialogue": clar_text,
-                        "priorities": lambda name: context.team.get_teammate_priorities(name)
-                    }
+                logger.info("Generating drafts for: %s", file_path)
+                                
+                # Query models
+                draft_prompt = DRAFT_TEMPLATE.format(
+                    goal=prompt_data.goal,
+                    file_path=str(file_path),
+                    clarification_dialogue=clar_text,
+                    priorities=lambda name: state.team.priorities(name)
                 )
                 
-                # Store each author's draft
+                logger.debug("Requesting drafts with prompt (%d chars)", len(draft_prompt))
+                responses = await state.team.query_parallel(
+                    draft_prompt,
+                    {}
+                )
+                logger.info("Received %d drafts", len(responses))
+                
+                # Store drafts
                 for model_name, draft_text in responses.items():
-                    context.drafts[model_name][Path(file_path)] = draft_text
-                    
-                context.log_step("draft", {
+                    state.drafts[model_name][file_path] = draft_text
+                    logger.info("Stored draft from %s for %s (%d chars)", 
+                              model_name, file_path, len(draft_text))
+                    logger.debug("Draft content preview:\n%s", draft_text[:500] + "...")
+                
+                state.log_step("draft", {
                     "file": str(file_path),
-                    "drafts": responses
+                    "drafts": {name: len(text) for name, text in responses.items()}
                 })
             
-            return context
+            # Log final draft state
+            logger.info("Final draft state:")
+            for author, drafts in state.drafts.items():
+                logger.info("  %s:", author)
+                for path, content in drafts.items():
+                    logger.info("    %s: %d chars", path, len(content))
+            
+            duration = (datetime.now() - start_time).total_seconds()
+            cost = state.team.provider.usage.totalCostUsd()
+            logger.info("Draft generation complete - Duration: %.2f seconds, Cost: $%.4f",
+                       duration, cost)
+            
+            return state
             
         except Exception as e:
+            logger.error("Draft generation failed: %s", str(e), exc_info=True)
             raise WorkflowError("Draft generation failed", {
                 "error": str(e),
                 "stage": "draft"
             })
 
 class Review(Job):
-    """
-    Job that handles code review feedback from each model.
-    
-    The Review job has each model review all drafts, providing structured
-    feedback according to their priorities and expertise.
-    """
-    
-    async def execute(self, context: Context) -> Context:
+    async def execute(self, state: WorkflowState) -> WorkflowState:
+        logger = logging.getLogger("loopflow.workflow.review")
+        logger.info("Starting review phase")
+        start_time = datetime.now()
+        
         try:
-            # Initialize review storage
-            for reviewer in context.team.llms:
-                context.reviews[reviewer] = {}
+            # Initialize review storage and log initial state
+            logger.info("Initial state:")
+            logger.info("  Drafts available from: %s", list(state.drafts.keys()))
+            for name, drafts in state.drafts.items():
+                logger.info("    %s has drafts for: %s", name, [str(p) for p in drafts.keys()])
+            
+            for reviewer in state.team.llms:
+                state.reviews[reviewer] = {}
+                logger.info("Initialized review storage for %s", reviewer)
 
-            # Have each team member review each author's drafts
-            for author, draft_dict in context.drafts.items():
-                # Format all drafts from this author
+            # Process each author's drafts
+            for author, draft_dict in state.drafts.items():
+                logger.info("Processing reviews for author: %s", author)
+                
+                # Format drafts
                 all_drafts_str = f"Draft by {author}:\n" + "\n\n".join(
                     f"## {file_path}:\n{content}" 
                     for file_path, content in draft_dict.items()
                 )
-
-                responses = await context.team.query_parallel(
-                    REVIEW_TEMPLATE,
-                    {
-                        "file_paths": "\n".join(str(p) for p in context.prompt.output_files),
-                        "draft": all_drafts_str,
-                        "priorities": lambda name: context.team.get_teammate_priorities(name)
-                    }
-                )
+                logger.debug("Formatted drafts for review (%d chars)", len(all_drafts_str))
                 
+                # Get reviews - ensure we pass correct template parameters
+                priorities = lambda name: state.team.priorities(name)
+                file_paths_str = "\n".join(str(p) for p in state.prompt.output_files)
+                
+                # Create template args dict explicitly
+                template_args = {
+                    "file_paths": file_paths_str,
+                    "draft": all_drafts_str,
+                    "priorities": priorities
+                }
+                
+                responses = await state.team.query_parallel(
+                    REVIEW_TEMPLATE,
+                    template_args
+                )
+                logger.info("Received %d reviews", len(responses))
+                
+                # Store reviews
                 for reviewer_name, review_text in responses.items():
-                    context.reviews[reviewer_name][author] = review_text
+                    state.reviews[reviewer_name][author] = review_text
+                    logger.info("Stored review from %s for %s's drafts (%d chars)", 
+                              reviewer_name, author, len(review_text))
+                    logger.debug("Review preview:\n%s", review_text[:500] + "...")
                     
-                context.log_step("review", {
+                state.log_step("review", {
                     "author": author,
-                    "reviews": responses
+                    "reviews": {name: len(text) for name, text in responses.items()}
                 })
             
-            return context
+            # Log final review state
+            logger.info("Final review state:")
+            for reviewer, reviews in state.reviews.items():
+                logger.info("  %s reviewed:", reviewer)
+                for author, review in reviews.items():
+                    logger.info("    %s's drafts: %d chars", author, len(review))
+            
+            duration = (datetime.now() - start_time).total_seconds()
+            cost = state.team.provider.usage.totalCostUsd()
+            logger.info("Review phase complete - Duration: %.2f seconds, Cost: $%.4f",
+                       duration, cost)
+            
+            return state
             
         except Exception as e:
+            logger.error("Review phase failed: %s", str(e), exc_info=True)
             raise WorkflowError("Review failed", {
                 "error": str(e),
-                "stage": "review"
+                "stage": "review",
+                "author": author if 'author' in locals() else None,
+                "reviewer": reviewer_name if 'reviewer_name' in locals() else None
             })
 
 class Synthesize(Job):
-    """
-    Job that creates final versions of each file by combining
-    the best elements of all drafts while addressing review feedback.
-    
-    The Synthesize job analyzes all drafts and reviews to create optimal
-    final implementations that incorporate the best ideas and address
-    key concerns.
-    """
-    
-    async def execute(self, context: Context) -> Context:
+    async def execute(self, state: WorkflowState) -> WorkflowState:
+        logger = logging.getLogger("loopflow.workflow.synthesize")
+        logger.info("Starting synthesis phase")
+        start_time = datetime.now()
+        
         try:
-            # Pick synthesizer (prefer 'maya' if available)
+            # Pick synthesizer
             synthesizer_name = "maya"
-            if synthesizer_name not in context.team.llms:
-                synthesizer_name = next(iter(context.team.llms.keys()))
-            synthesizer = context.team.llms[synthesizer_name]
+            if synthesizer_name not in state.team.llms:
+                synthesizer_name = next(iter(state.team.llms.keys()))
+            synthesizer = state.team.llms[synthesizer_name]
+            logger.info("Selected synthesizer: %s", synthesizer_name)
+            
+            # Log initial state with extra path details
+            logger.info("Initial state:")
+            logger.info("  Drafts available from: %s", list(state.drafts.keys()))
+            for author, drafts in state.drafts.items():
+                logger.info("    %s has drafts for: %s (%s)", 
+                    author, 
+                    [str(p) for p in drafts.keys()],
+                    [type(p).__name__ for p in drafts.keys()]
+                )
+            logger.info("  Reviews available from: %s", list(state.reviews.keys()))
+            for reviewer, reviews in state.reviews.items():
+                logger.info("    %s reviewed: %s", reviewer, list(reviews.keys()))
 
             # Process each output file
-            for file_path in context.prompt.output_files:
-                # Collect all drafts and reviews for this file
+            for file_path in state.prompt.output_files:
+                logger.info("Synthesizing file: %s (type: %s)", file_path, type(file_path).__name__)
+                
+                # Ensure consistent Path type
+                if isinstance(file_path, str):
+                    file_path = Path(file_path)
+                
+                # Normalize path for comparison
+                file_path = file_path.resolve()
+                
+                # Debug logging for path comparison
+                logger.debug("Looking for drafts with path: %s", file_path)
+                for author, drafts in state.drafts.items():
+                    logger.debug("  %s drafts:", author)
+                    for draft_path in drafts.keys():
+                        logger.debug("    %s (type: %s)", draft_path, type(draft_path).__name__)
+                
+                # Collect drafts and reviews
                 author_drafts_and_reviews = []
-                for author, draft_dict in context.drafts.items():
-                    if file_path not in draft_dict:
+                for author, draft_dict in state.drafts.items():
+                    # Try both the path and its string representation
+                    draft_text = None
+                    if file_path in draft_dict:
+                        draft_text = draft_dict[file_path]
+                    elif str(file_path) in draft_dict:
+                        draft_text = draft_dict[str(file_path)]
+                    else:
+                        # Try resolving paths
+                        for draft_path in draft_dict.keys():
+                            if isinstance(draft_path, str):
+                                draft_path = Path(draft_path)
+                            if draft_path.resolve() == file_path:
+                                draft_text = draft_dict[draft_path]
+                                break
+                    
+                    if draft_text is None:
+                        logger.warning("No draft found for %s from %s", file_path, author)
                         continue
                         
-                    draft_str = f"Draft by {author}:\n{draft_dict[file_path]}\n"
+                    draft_str = f"Draft by {author}:\n{draft_text}\n"
                     reviews_str = "\n\n".join(
                         f"Review by {reviewer}:\n{review_dict.get(author, 'No review')}\n" 
-                        for reviewer, review_dict in context.reviews.items()
+                        for reviewer, review_dict in state.reviews.items()
                     )
-                    author_drafts_and_reviews.append(f"{draft_str}\n\nReviews:\n{reviews_str}\n")
+                    combined = f"{draft_str}\n\nReviews:\n{reviews_str}\n"
+                    author_drafts_and_reviews.append(combined)
+                    logger.info("Added draft+reviews for %s (%d chars)", author, len(combined))
 
+                logger.info("Collected %d drafts with reviews", len(author_drafts_and_reviews))
+                if not author_drafts_and_reviews:
+                    error_msg = f"No drafts found for {file_path}"
+                    logger.error(error_msg)
+                    logger.error("Available drafts: %s", {
+                        author: [str(p) for p in drafts.keys()]
+                        for author, drafts in state.drafts.items()
+                    })
+                    raise WorkflowError(error_msg, {
+                        "file": str(file_path),
+                        "available_drafts": {
+                            author: [str(p) for p in drafts.keys()]
+                            for author, drafts in state.drafts.items()
+                        }
+                    })
+                
+                # Generate synthesis
                 full_context = "\n\n".join(author_drafts_and_reviews)
-            
-                # Generate synthesized version
-                combined_prompt = SYNTHESIS_TEMPLATE.format(
+                
+                synthesis_prompt = SYNTHESIS_TEMPLATE.format(
                     file_path=str(file_path),
                     drafts_and_reviews=full_context
                 )
+                logger.debug("Synthesis prompt prepared (%d chars)", len(synthesis_prompt))
 
-                final_content = await synthesizer.chat(combined_prompt)
-                context.outputs[file_path] = final_content
+                logger.info("Requesting synthesis for: %s", file_path)
+                final_content = await synthesizer.chat(synthesis_prompt)
+                logger.info("Received synthesized content (%d chars)", len(final_content))
+                logger.debug("Content preview:\n%s", final_content[:500] + "...")
                 
-                context.log_step("synthesize", {
+                # Store result
+                state.outputs[file_path] = final_content
+                logger.info("Stored synthesized output for %s", file_path)
+                
+                state.log_step("synthesize", {
                     "file": str(file_path),
-                    "content": final_content
+                    "content_length": len(final_content)
                 })
             
-            return context
+            # Log final state
+            logger.info("Final output state:")
+            for path, content in state.outputs.items():
+                logger.info("  %s: %d chars", path, len(content))
+            
+            duration = (datetime.now() - start_time).total_seconds()
+            cost = state.team.provider.usage.totalCostUsd()
+            logger.info("Synthesis complete - Duration: %.2f seconds, Cost: $%.4f",
+                       duration, cost)
+            
+            return state
             
         except Exception as e:
+            logger.error("Synthesis failed: %s", str(e), exc_info=True)
             raise WorkflowError("Synthesis failed", {
                 "error": str(e),
                 "stage": "synthesize",
@@ -329,37 +475,41 @@ class Synthesize(Job):
 class Sequential(Job):
     """
     Composes multiple jobs into a single job, running them in order.
-    
-    Sequential provides a way to combine multiple jobs into a pipeline
-    where each job's output context becomes the input context for the
-    next job.
     """
     
     def __init__(self, jobs: List[Job]):
-        """
-        Initialize with list of jobs to execute in sequence.
-        
-        Args:
-            jobs: List of Job instances to execute in order
-        """
+        """Initialize with list of jobs to execute in sequence."""
+        super().__init__()
         self.jobs = jobs
     
-    async def execute(self, context: Context) -> Context:
-        """
-        Execute all jobs in sequence, passing context through each.
+    async def execute(self, state: WorkflowState) -> WorkflowState:
+        logger = logging.getLogger("loopflow.workflow.sequential")
+        logger.info("Starting sequential pipeline with %d jobs", len(self.jobs))
+        start_time = datetime.now()
         
-        Args:
-            context: Initial workflow context
+        current_context = state
+        for i, job in enumerate(self.jobs, 1):
+            job_name = job.__class__.__name__
+            logger.info("Starting job %d/%d: %s", i, len(self.jobs), job_name)
             
-        Returns:
-            Final context after all jobs complete
-            
-        Raises:
-            WorkflowError: If any job fails
-        """
-        current_context = context
-        for job in self.jobs:
-            current_context = await job.execute(current_context)
+            try:
+                current_context = await job.execute(current_context)
+                usage = state.team.provider.usage
+                logger.info(
+                    "Completed job %s - Current cost: $%.4f", 
+                    job_name, usage.totalCostUsd()
+                )
+            except Exception as e:
+                logger.error("Job %s failed: %s", job_name, str(e))
+                raise
+        
+        duration = (datetime.now() - start_time).total_seconds()
+        usage = state.team.provider.usage
+        logger.info(
+            "Pipeline complete - Total duration: %.2f seconds, Total cost: $%.4f",
+            duration, usage.totalCostUsd()
+        )
+        
         return current_context
 
 # -----------------------------------------------------------------------------
@@ -371,15 +521,19 @@ def default_pipeline() -> Job:
     Create the standard generation pipeline.
     
     Returns:
-        A Sequential job combining the standard workflow:
+        A Sequential job combining:
         1. Clarify requirements
         2. Generate initial drafts
         3. Review all drafts
         4. Synthesize final versions
     """
-    return Sequential([
+    logger = logging.getLogger("loopflow.workflow")
+    logger.debug("Creating default pipeline")
+    pipeline = Sequential([
         Clarify(),
         Draft(),
         Review(),
         Synthesize()
     ])
+    logger.debug("Default pipeline created with 4 jobs")
+    return pipeline

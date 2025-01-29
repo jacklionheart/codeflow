@@ -3,15 +3,14 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Dict, Any
 
-from loopflow.llm import LLM
-
-
+from loopflow.llm import LLM, LLMProvider
 class Team:
     """
     A set of LLMs used to execute jobs.
     """
     
-    def __init__(self, llms: Dict[str, LLM]):
+    def __init__(self, provider: LLMProvider, llms: Dict[str, LLM]):
+        self.provider = provider
         self.llms = llms
 
     def priorities(self, name: str) -> str:

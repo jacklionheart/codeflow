@@ -1,34 +1,117 @@
+"""
+prompt.py
+Parsing user prompt markdown files
+"""
+
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional, Dict
-import yaml
+from typing import List, Optional
 from yaml.parser import ParserError
+from loopflow.file import resolve_codebase_path
 
 class PromptError(Exception):
     """Exception raised for errors in the prompt file."""
     pass
 
-@dataclass
+# Update prompt.py to add validation and path handling:
+
 class Prompt:
     """Represents a parsed loopflow prompt file."""
-    goal: str
-    output_files: List[str]
-    reviewers: List[str]
-    context_files: Optional[List[str]] = None
+    def __init__(
+        self, 
+        goal: str,
+        output_files: List[str | Path],
+        team: List[str],
+        context_files: Optional[List[str | Path]] = None
+    ):
+        # Validate inputs
+        if not goal or not goal.strip():
+            raise PromptError("Goal cannot be empty")
+        if not output_files:
+            raise PromptError("At least one output file is required")
+        if not team:
+            raise PromptError("At least one team member is required")
+
+        self.goal = goal.strip()
+        
+        # Resolve output file paths
+        try:
+            self.output_files = [
+                resolve_codebase_path(p, for_reading=False) 
+                for p in output_files
+            ]
+        except ValueError as e:
+            raise PromptError(f"Invalid output path: {e}")
+            
+        # Resolve context file paths
+        self.context_files = None
+        if context_files:
+            try:
+                self.context_files = [
+                    resolve_codebase_path(p, for_reading=True)
+                    for p in context_files
+                ]
+            except ValueError as e:
+                raise PromptError(f"Invalid context path: {e}")
+        
+        # Clean team member list
+        self.team = []
+        for member in team:
+            # Strip bullets and whitespace
+            cleaned = member.strip()
+            cleaned = cleaned.lstrip('-').strip()
+            cleaned = cleaned.lstrip('*').strip()
+            if cleaned:
+                self.team.append(cleaned)
+        if not self.team:
+            raise PromptError("At least one team member is required")
 
     @classmethod
     def from_file(cls, path: Path) -> 'Prompt':
-        """Create a Prompt instance from a markdown file."""
+        """Create a prompt instance from a markdown file."""
         try:
-            content = path.read_text()
-            sections = cls._parse_sections(content)
+            sections = cls._parse_sections(path.read_text())
+            
+            # Basic validation
+            if sections.get('Goal', '').strip() == '':
+                raise PromptError("Goal section is required")
+            if sections.get('Output', '').strip() == '':
+                raise PromptError("Output section is required")
+            if sections.get('Team', '').strip() == '':
+                raise PromptError("Team section is required")
+
+            # Parse sections
+            output_files = [
+                f.strip() for f in sections['Output'].split('\n')
+                if f.strip()
+            ]
+            
+            context_files = None
+            if 'Context' in sections:
+                context_files = []
+                for line in sections['Context'].split('\n'):
+                    context_files.extend(
+                        f.strip()
+                        for f in line.split(',')
+                        if f.strip()
+                    )
+
+            team = [
+                line.strip()
+                for line in sections['Team'].split('\n')
+                if line.strip()
+            ]
+            
+            # Create instance
             return cls(
-                goal=sections.get('Goal', '').strip(),
-                output_files=cls._parse_output_files(sections.get('Output', '')),
-                context_files=cls._parse_context_files(sections.get('Context', '')),
-                reviewers=cls._parse_reviewers(sections.get('Reviewers', ''))
+                goal=sections['Goal'].strip(),
+                output_files=output_files,
+                team=team,
+                context_files=context_files
             )
-        except (IOError, ParserError) as e:
+        except Exception as e:
+            if isinstance(e, PromptError):
+                raise
             raise PromptError(f"Failed to parse prompt file: {e}")
 
     @staticmethod
@@ -51,76 +134,3 @@ class Prompt:
             sections[current_section] = '\n'.join(current_content).strip()
 
         return sections
-    
-    @staticmethod
-    def _parse_output_files(content: str) -> List[str]:
-        """Parse output files section."""
-        files = [f.strip() for f in content.split('\n') if f.strip()]
-        if not files:
-            raise PromptError("At least one output file is required")
-        return files
-
-
-    @staticmethod
-    def _parse_context_files(content: str) -> Optional[List[str]]:
-        """Parse context files section."""
-        if not content:
-            return None
-        # First split by newlines to get separate lines
-        lines = content.split('\n')
-        # Then split each line by commas and flatten
-        files = []
-        for line in lines:
-            files.extend(f.strip() for f in line.split(',') if f.strip())
-        return files
-
-
-    @staticmethod
-    def _parse_reviewers(content: str) -> List[str]:
-        """Parse reviewers section."""
-        reviewers = []
-        if not content:
-            raise PromptError("At least one reviewer is required")  # Changed from "Reviewers section is required"
-        
-        for line in content.split('\n'):
-            if line.strip().startswith('-'):
-                reviewer = line.strip()[1:].strip()
-                if reviewer:
-                    reviewers.append(reviewer)        
-        if not reviewers:
-            raise PromptError("At least one reviewer is required")
-        return reviewers
-        
-    def validate(self) -> None:
-        """Validate the prompt content."""
-        if not self.goal:
-            raise PromptError("Goal section is required")
-        if not self.output_files:
-            raise PromptError("At least one output file is required")
-        if not self.reviewers:
-            raise PromptError("At least one reviewer is required")          
-
-def format_file_list(files: List[str]) -> str:
-    """Format a list of files for inclusion in a prompt."""
-    return "\n".join(f"- {f}" for f in files)
-
-def format_clarifications(qa_pairs: Dict[str, str]) -> str:
-    """Format Q&A pairs for inclusion in a prompt."""
-    return "\n\n".join(
-        f"Q: {q}\nA: {a}"
-        for q, a in qa_pairs.items()
-    )
-
-def format_drafts(drafts: Dict[str, str]) -> str:
-    """Format multiple code drafts for inclusion in a prompt."""
-    return "\n\n".join(
-        f"=== {reviewer} Draft ===\n{content}"
-        for reviewer, content in drafts.items()
-    )
-
-def format_reviews(reviews: List[str]) -> str:
-    """Format multiple reviews for inclusion in a prompt."""
-    return "\n\n".join(
-        f"=== Review {i+1} ===\n{review}"
-        for i, review in enumerate(reviews)
-    )

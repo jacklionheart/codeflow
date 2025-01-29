@@ -57,7 +57,7 @@ Create a prompt file defining your requirements:
 ## Goal
 Implement the LLM API for loopflow, a tool for generating code with teams of LLMs.
 
-## Output Files
+## Output
 loopflow/llm/llm.py
 loopflow/llm/anthropic.py
 loopflow/tests/test_llm.py

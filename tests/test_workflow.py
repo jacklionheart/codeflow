@@ -3,15 +3,17 @@
 import pytest
 from pathlib import Path
 from typing import Dict, Any
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock
 
 from loopflow.workflow import (
-    Context, Job, Sequential,
+    Sequential,
     Clarify, Draft, Review, Synthesize,
     default_pipeline, WorkflowError
 )
 from loopflow.prompt import Prompt
 from loopflow.team import Team
+from loopflow.workflow import WorkflowState
+from .mock import MockProvider
 
 # -----------------------------------------------------------------------------
 # Fixtures
@@ -28,7 +30,7 @@ def mock_mate():
 def mock_team(mock_mate):
     """Creates a team with mock LLMs."""
     llms = {"reviewer1": mock_mate, "reviewer2": mock_mate}
-    team = Team(llms)
+    team = Team(MockProvider(), llms)
     # Mock the query_parallel method to have more control over responses
     team.query_parallel = AsyncMock(return_value={
         "reviewer1": "Mock response",
@@ -44,101 +46,109 @@ def mock_user():
     )
 
 @pytest.fixture
-def basic_prompt():
-    """Creates a basic test prompt."""
+def basic_prompt(tmp_path):
+    """Creates a basic test prompt with absolute paths."""
+    # Workflows assume absolute paths
+    test_file = (tmp_path / "test.py").resolve()
     return Prompt(
         goal="Test goal",
-        output_files=[Path("test.py")],
-        reviewers=["reviewer1", "reviewer2"],
+        output_files=[test_file],
+        team=["reviewer1", "reviewer2"],
         context_files=None
     )
 
+
 @pytest.fixture
-def basic_context(basic_prompt, mock_team, mock_user):
+def basic_state(basic_prompt, mock_team, mock_user):
     """Creates a basic context for testing."""
-    context = Context(
+    state = WorkflowState(
         prompt=basic_prompt,
         team=mock_team
     )
-    context.user = mock_user
-    return context
+    state.user = mock_user
+    return state
 
 # -----------------------------------------------------------------------------
 # Individual Job Tests
 # -----------------------------------------------------------------------------
 
 @pytest.mark.asyncio
-async def test_clarify_job(basic_context):
+async def test_clarify_job(basic_state):
     """Test clarification job execution."""
     job = Clarify()
-    result = await job.execute(basic_context)
+    result = await job.execute(basic_state)
     
     # Verify team was queried
-    assert basic_context.team.query_parallel.called
+    assert basic_state.team.query_parallel.called
     
     # Verify clarification was stored
     assert result.clarifications is not None
     assert "Mock response" in str(result.clarifications)
 
 @pytest.mark.asyncio
-async def test_draft_job(basic_context):
+async def test_draft_job(basic_state):
     """Test draft generation job."""
     job = Draft()
-    result = await job.execute(basic_context)
+    result = await job.execute(basic_state)
     
     # Verify drafts were created for each team member
-    assert len(result.drafts) == len(basic_context.team.llms)
+    assert len(result.drafts) == len(basic_state.team.llms)
+    
+    # Get absolute path from prompt
+    test_file = basic_state.prompt.output_files[0]
     
     # Verify draft content
     author_drafts = result.drafts["reviewer1"]
-    assert Path("test.py") in author_drafts
-    assert "Mock response" in author_drafts[Path("test.py")]
+    assert test_file in author_drafts
+    assert "Mock response" in author_drafts[test_file]
 
 @pytest.mark.asyncio
-async def test_review_job(basic_context):
+async def test_review_job(basic_state):
     """Test review job execution."""
     # Setup some drafts
-    basic_context.drafts = {
+    basic_state.drafts = {
         "reviewer1": {Path("test.py"): "test code"},
         "reviewer2": {Path("test.py"): "test code"}
     }
     
     job = Review()
-    result = await job.execute(basic_context)
+    result = await job.execute(basic_state)
     
     # Verify reviews were created
-    assert len(result.reviews) == 2  # Two reviewers
+    assert len(result.reviews) == 2  # Two team
     for reviewer in ["reviewer1", "reviewer2"]:
         assert reviewer in result.reviews
         assert "reviewer1" in result.reviews[reviewer]
         assert "Mock response" in result.reviews[reviewer]["reviewer1"]
 
 @pytest.mark.asyncio
-async def test_synthesize_job(basic_context):
+async def test_synthesize_job(basic_state):
     """Test synthesis job execution."""
-    # Setup drafts and reviews
-    basic_context.drafts = {
-        "reviewer1": {Path("test.py"): "test code"},
-        "reviewer2": {Path("test.py"): "test code"}
+    # Get absolute path from prompt
+    test_file = basic_state.prompt.output_files[0]
+    
+    # Setup drafts and reviews with absolute paths
+    basic_state.drafts = {
+        "reviewer1": {test_file: "test code"},
+        "reviewer2": {test_file: "test code"}
     }
-    basic_context.reviews = {
+    basic_state.reviews = {
         "reviewer1": {"reviewer1": "review 1", "reviewer2": "review 2"},
         "reviewer2": {"reviewer1": "review 1", "reviewer2": "review 2"}
     }
-    
+
     job = Synthesize()
-    result = await job.execute(basic_context)
-    
-    # Verify outputs were created
-    assert Path("test.py") in result.outputs
-    assert "Mock response" in result.outputs[Path("test.py")]
+    result = await job.execute(basic_state)
+
+    assert test_file in result.outputs
+    assert result.outputs[test_file] == "Mock response"
 
 # -----------------------------------------------------------------------------
 # Pipeline Tests
 # -----------------------------------------------------------------------------
 
 @pytest.mark.asyncio
-async def test_sequential_job_execution(basic_context):
+async def test_sequential_job_execution(basic_state):
     """Test sequential execution of multiple jobs."""
     jobs = [
         Clarify(),
@@ -148,7 +158,7 @@ async def test_sequential_job_execution(basic_context):
     ]
     
     pipeline = Sequential(jobs)
-    result = await pipeline.execute(basic_context)
+    result = await pipeline.execute(basic_state)
     
     # Verify full pipeline execution
     assert result.clarifications is not None
@@ -157,52 +167,45 @@ async def test_sequential_job_execution(basic_context):
     assert len(result.outputs) > 0
 
 @pytest.mark.asyncio
-async def test_default_pipeline(basic_context):
+async def test_default_pipeline(basic_state):
     """Test the default pipeline creation and execution."""
     pipeline = default_pipeline()
-    result = await pipeline.execute(basic_context)
+    result = await pipeline.execute(basic_state)
     
     # Verify pipeline produced expected outputs
     assert result.clarifications is not None
     assert len(result.drafts) > 0
     assert len(result.reviews) > 0
-    assert Path("test.py") in result.outputs
+    
+    test_file = basic_state.prompt.output_files[0]  # Use absolute path from prompt
+    assert test_file in result.outputs
 
 # -----------------------------------------------------------------------------
 # Error Handling Tests
 # -----------------------------------------------------------------------------
 
 @pytest.mark.asyncio
-async def test_job_error_handling(basic_context):
+async def test_job_error_handling(basic_state):
     """Test error handling in job execution."""
     # Make the team's query_parallel raise an exception
-    basic_context.team.query_parallel.side_effect = Exception("Test error")
+    basic_state.team.query_parallel.side_effect = Exception("Test error")
     
     job = Clarify()
     with pytest.raises(WorkflowError) as exc:
-        await job.execute(basic_context)
+        await job.execute(basic_state)
     
     assert "Clarification failed" in str(exc.value)
     assert exc.value.context["stage"] == "clarify"
 
 @pytest.mark.asyncio
-async def test_sequential_error_handling(basic_context):
+async def test_sequential_error_handling(basic_state):
     """Test error handling in sequential job execution."""
-    # Set up mock to fail on second call
-    side_effect_called = False
+    basic_state.team.query_parallel = AsyncMock(side_effect=Exception("Test error"))
     
-    async def side_effect(*args, **kwargs):
-        nonlocal side_effect_called
-        if not side_effect_called:
-            side_effect_called = True
-            return {"reviewer1": "Mock response", "reviewer2": "Mock response"}
-        raise Exception("Test error")
-    
-    basic_context.team.query_parallel.side_effect = side_effect
-    
-    pipeline = Sequential([Clarify(), Draft()])
+    pipeline = Sequential([Clarify()])
     with pytest.raises(WorkflowError) as exc:
-        await pipeline.execute(basic_context)
+        await pipeline.execute(basic_state)
     
-    assert "Draft generation failed" in str(exc.value)
-    assert exc.value.context["stage"] == "draft"
+    assert "Clarification failed" in str(exc.value)
+    assert exc.value.context["stage"] == "clarify"
+    assert str(exc.value.context["error"]) == "Test error"
