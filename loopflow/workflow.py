@@ -137,7 +137,6 @@ class Clarify(Job):
                     "goal": state.prompt.goal,
                     "file_paths": "\n".join(str(p) for p in state.prompt.output_files),
                     "context": get_context(state.prompt.context_files),
-                    "priorities": lambda name: state.team.priorities(name)
                 }
             )
             
@@ -162,7 +161,7 @@ class Clarify(Job):
             logger.info("Stored clarifications in state")
             
             duration = (datetime.now() - start_time).total_seconds()
-            cost = state.team.provider.usage.totalCostUsd()
+            cost = state.team.total_cost()
             logger.info("Clarification complete - Duration: %.2f seconds, Cost: $%.4f", 
                        duration, cost)
             
@@ -210,7 +209,6 @@ class Draft(Job):
                     goal=prompt_data.goal,
                     file_path=str(file_path),
                     clarification_dialogue=clar_text,
-                    priorities=lambda name: state.team.priorities(name)
                 )
                 
                 logger.debug("Requesting drafts with prompt (%d chars)", len(draft_prompt))
@@ -240,7 +238,7 @@ class Draft(Job):
                     logger.info("    %s: %d chars", path, len(content))
             
             duration = (datetime.now() - start_time).total_seconds()
-            cost = state.team.provider.usage.totalCostUsd()
+            cost = state.team.total_cost()
             logger.info("Draft generation complete - Duration: %.2f seconds, Cost: $%.4f",
                        duration, cost)
             
@@ -282,14 +280,12 @@ class Review(Job):
                 logger.debug("Formatted drafts for review (%d chars)", len(all_drafts_str))
                 
                 # Get reviews - ensure we pass correct template parameters
-                priorities = lambda name: state.team.priorities(name)
                 file_paths_str = "\n".join(str(p) for p in state.prompt.output_files)
                 
                 # Create template args dict explicitly
                 template_args = {
                     "file_paths": file_paths_str,
                     "draft": all_drafts_str,
-                    "priorities": priorities
                 }
                 
                 responses = await state.team.query_parallel(
@@ -318,7 +314,7 @@ class Review(Job):
                     logger.info("    %s's drafts: %d chars", author, len(review))
             
             duration = (datetime.now() - start_time).total_seconds()
-            cost = state.team.provider.usage.totalCostUsd()
+            cost = state.team.total_cost()
             logger.info("Review phase complete - Duration: %.2f seconds, Cost: $%.4f",
                        duration, cost)
             
@@ -454,7 +450,7 @@ class Synthesize(Job):
                 logger.info("  %s: %d chars", path, len(content))
             
             duration = (datetime.now() - start_time).total_seconds()
-            cost = state.team.provider.usage.totalCostUsd()
+            cost = state.team.total_cost()
             logger.info("Synthesis complete - Duration: %.2f seconds, Cost: $%.4f",
                        duration, cost)
             
@@ -494,20 +490,20 @@ class Sequential(Job):
             
             try:
                 current_context = await job.execute(current_context)
-                usage = state.team.provider.usage
+                usage = state.team.total_cost()
                 logger.info(
                     "Completed job %s - Current cost: $%.4f", 
-                    job_name, usage.totalCostUsd()
+                    job_name, usage
                 )
             except Exception as e:
                 logger.error("Job %s failed: %s", job_name, str(e))
                 raise
         
         duration = (datetime.now() - start_time).total_seconds()
-        usage = state.team.provider.usage
+        usage = state.team.total_cost()
         logger.info(
             "Pipeline complete - Total duration: %.2f seconds, Total cost: $%.4f",
-            duration, usage.totalCostUsd()
+            duration, usage
         )
         
         return current_context

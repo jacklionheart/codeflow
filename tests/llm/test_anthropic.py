@@ -1,5 +1,3 @@
-"""Tests for the LLM infrastructure."""
-
 import pytest
 from unittest.mock import AsyncMock, patch
 import asyncio
@@ -7,37 +5,7 @@ import asyncio
 from loopflow.llm import LLMError
 from loopflow.llm.anthropic import Anthropic
 
-# -----------------------------------------------------------------------------
-# Fixtures
-# -----------------------------------------------------------------------------
-
 @pytest.fixture
-def mock_response():
-    """Create a mock API response object."""
-    return type('Response', (), {
-        'content': [
-            type('Content', (), {
-                'text': 'Test response'
-            })()
-        ],
-        'usage': type('Usage', (), {
-            'input_tokens': 10,
-            'output_tokens': 20
-        })
-    })()
-
-@pytest.fixture
-def config():
-    """Create a standard config for testing."""
-    return {
-        "api_key": "test_key",
-        "timeout": 1.0,
-        "max_retries": 1
-    }
-
-# -----------------------------------------------------------------------------
-# Provider Tests
-# -----------------------------------------------------------------------------
 
 @pytest.mark.asyncio
 async def test_anthropic_chat(config, mock_response):
@@ -48,7 +16,7 @@ async def test_anthropic_chat(config, mock_response):
         mock_anthropic.return_value = mock_client
         
         provider = Anthropic(config)
-        llm = provider.createLLM("test", "You are a test assistant.", "Correctness, Clarity, Completeness")
+        llm = provider.createLLM("test", "You are a test assistant.")
         
         response = await llm.chat("Hello")
         
@@ -67,7 +35,7 @@ async def test_anthropic_conversation_history(config, mock_response):
         mock_anthropic.return_value = mock_client
         
         provider = Anthropic(config)
-        llm = provider.createLLM("test", "You are a test assistant.", "Correctness, Clarity, Completeness")
+        llm = provider.createLLM("test", "You are a test assistant.")
         
         # First message
         await llm.chat("Hello")
@@ -111,7 +79,7 @@ async def test_anthropic_token_tracking(config):
         mock_anthropic.return_value = mock_client
         
         provider = Anthropic(config)
-        llm = provider.createLLM("test", "You are a test assistant.", "Correctness, Clarity, Completeness")
+        llm = provider.createLLM("test", "You are a test assistant.")
         
         await llm.chat("Message 1")
         await llm.chat("Message 2")
@@ -129,7 +97,7 @@ async def test_anthropic_error_handling(config):
         mock_anthropic.return_value = mock_client
         
         provider = Anthropic(config)
-        llm = provider.createLLM("test", "You are a test assistant.", "Correctness, Clarity, Completeness")
+        llm = provider.createLLM("test", "You are a test assistant.")
         
         with pytest.raises(LLMError) as exc:
             await llm.chat("Hello")
@@ -165,7 +133,7 @@ async def test_anthropic_timeout(config):
             "max_retries": 1
         }
         provider = Anthropic(test_config)
-        llm = provider.createLLM("test", "You are a test assistant.", "Correctness, Clarity, Completeness")
+        llm = provider.createLLM("test", "You are a test assistant.")
         
         with pytest.raises(LLMError) as exc:
             await llm.chat("Hello")
@@ -205,7 +173,7 @@ async def test_anthropic_token_tracking(config):
         mock_anthropic.return_value = mock_client
         
         provider = Anthropic(config)
-        llm = provider.createLLM("test", "You are a test assistant.", "Correctness, Clarity, Completeness")
+        llm = provider.createLLM("test", "You are a test assistant.")
         
         await llm.chat("Message 1")
         await llm.chat("Message 2")

@@ -9,13 +9,13 @@ execution setup while delegating the actual work to the Session class.
 
 import asyncio
 import logging
+import os
 from pathlib import Path
-import yaml
 import click
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 
 from loopflow.prompt import Prompt
-from loopflow.llm import LLMProvider, Anthropic, LLM
+from loopflow.llm import LLMProvider, Anthropic, LLM, OpenAI
 from loopflow.session import Session, User
 from loopflow.templates import load_all_teammates
 
@@ -25,75 +25,39 @@ class ConfigError(Exception):
     """Exception raised for configuration errors."""
     pass
 
-def load_config(path: Optional[Path]) -> Dict[str, Any]:
-    """
-    Load and validate configuration from file.
-    
-    Args:
-        path: Path to config file, or None for default location
-        
-    Returns:
-        Parsed configuration dictionary
-        
-    Raises:
-        ConfigError: If config is missing or invalid
-    """
-    # Use default config path if none provided
-    if not path:
-        path = Path.home() / "loopflow" / "config.yaml"
-    
-    logger.debug("Loading config from: %s", path)
-    
-    if not path.exists():
-        logger.error("Config file not found: %s", path)
-        raise ConfigError(f"Config file not found: {path}")
-    
-    try:
-        config = yaml.safe_load(path.read_text())
-        logger.debug("Config loaded successfully")
-        return config
-        
-    except Exception as e:
-        logger.error("Failed to load config: %s", e)
-        raise ConfigError(f"Failed to load config: {e}")
-
-def setup_provider(config: Dict[str, Any]) -> LLMProvider:
-    """
-    Create an LLM provider from configuration.
-    
-    Args:
-        config: Configuration dictionary
-        
-    Returns:
-        Configured LLM provider
-        
-    Raises:
-        ConfigError: If provider configuration is invalid
-    """
+def setup_providers() -> Dict[str, LLMProvider]:
     logger.debug("Setting up LLM provider")
 
-    # Validate required sections
-    if "accounts" not in config:
-        logger.error("Missing 'accounts' section in config")
-        raise ConfigError("Missing 'accounts' section in config")
+    providers = {}
 
-    # For now, require Anthropic
-    if "anthropic" in config["accounts"]:
+    if "ANTHROPIC_API_KEY" in os.environ:
         logger.info("Creating Anthropic provider")
-        return Anthropic(config["accounts"]["anthropic"])
-    else:
-        logger.error("No valid LLM provider configured")
+        config = {
+            "api_key": os.environ["ANTHROPIC_API_KEY"],
+        }
+        providers["anthropic"] = Anthropic(config)
+
+    if "OPENAI_API_KEY" in os.environ:     
+        logger.info("Creating OpenAI provider")
+        config = {
+            "api_key": os.environ["OPENAI_API_KEY"],
+        }
+        providers["openai"] = OpenAI(config)
+
+    if len(providers) == 0:
+        logger.error("No valid LLM providers found; set ANTHROPIC_API_KEY and/or OPENAI_API_KEY")
         raise ConfigError("No valid LLM provider configured")
 
-def load_llms(provider: LLMProvider, teammates: Dict[str, Any]) -> Dict[str, LLM]:
+    return providers
+
+def load_llms(providers: Dict[str, LLMProvider], teammates: Dict[str, Any]) -> Dict[str, LLM]:
     logger.debug("Loading LLMs for team members: %s", list(teammates.keys()))
     llms = {}
     for name, mate in teammates.items():
         logger.debug("Creating LLM for team member: %s", name)
-        llms[name] = provider.createLLM(
+        llms[name] = providers[mate.provider].createLLM(
             name=name,
             system_prompt=mate.system_prompt,
-            priorities=mate.priorities
         )
     return llms
 
@@ -127,8 +91,7 @@ def run(prompt_file: Path, config: Optional[Path], debug: bool):
         prompt = Prompt.from_file(prompt_file)
         logger.info("Prompt parsed and validated successfully")
         
-        config_data = load_config(config)
-        provider = setup_provider(config_data)
+        providers = setup_providers()
         
         if debug:
             click.echo(f"Parsed prompt from {prompt_file}")
@@ -145,8 +108,8 @@ def run(prompt_file: Path, config: Optional[Path], debug: bool):
         logger.info("Creating session")
         session = Session(
             user=user,
-            available_llms=load_llms(provider, teammates),
-            provider=provider
+            available_llms=load_llms(providers, teammates),
+            providers=providers
         )
         
         logger.info("Running session")

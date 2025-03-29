@@ -30,7 +30,7 @@ def mock_mate():
 def mock_team(mock_mate):
     """Creates a team with mock LLMs."""
     llms = {"reviewer1": mock_mate, "reviewer2": mock_mate}
-    team = Team(MockProvider(), llms)
+    team = Team({"mock": MockProvider()}, llms)
     # Mock the query_parallel method to have more control over responses
     team.query_parallel = AsyncMock(return_value={
         "reviewer1": "Mock response",

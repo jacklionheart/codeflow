@@ -32,9 +32,9 @@ class Anthropic(LLMProvider):
         print(f"Anthropic client initialized with API key: {config}")
 
     
-    def createLLM(self, name: str, system_prompt: str, priorities: str) -> LLM:
+    def createLLM(self, name: str, system_prompt: str) -> LLM:
         """Create a new model instance."""
-        return Claude(name, self, system_prompt, priorities)
+        return Claude(name, self, system_prompt)
 
 class Claude(LLM):
     """
@@ -44,9 +44,9 @@ class Claude(LLM):
     contextual chat interactions through the same model.
     """
 
-    def __init__(self, name: str, provider: Anthropic, system_prompt: str = "", priorities: str = ""):
+    def __init__(self, name: str, provider: Anthropic, system_prompt: str = ""):
         """Initialize Claude instance."""
-        super().__init__(name, provider, system_prompt, priorities)
+        super().__init__(name, provider, system_prompt)
         self.anthropic = provider
 
     async def _chat(self, prompt: str) -> Tuple[str, int, int]:

@@ -21,19 +21,17 @@ def basic_session(mock_user, mock_provider):
         "reviewer1": mock_provider.createLLM(
             name="reviewer1",
             system_prompt="Test system prompt",
-            priorities="Test priorities"
         ),
         "reviewer2": mock_provider.createLLM(
             name="reviewer2", 
             system_prompt="Test system prompt",
-            priorities="Test priorities"
         )
     }
     
     # Create session with required components
     session = Session(
         user=mock_user,
-        provider=mock_provider,
+        providers={"mock": mock_provider},
         available_llms=llms,
         timeout=1.0
     )

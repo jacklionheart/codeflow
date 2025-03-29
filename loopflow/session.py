@@ -11,7 +11,7 @@ import shutil
 import tempfile
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, Optional, Any, Set
+from typing import Dict, Optional, Any, Set, List
 
 from .prompt import Prompt
 from .workflow import default_pipeline, Job, WorkflowState
@@ -19,7 +19,6 @@ from .llm import LLMProvider, LLM
 from .team import Team
 import logging
 
-# Configure logging with a specific format for loopflow
 logger = logging.getLogger("loopflow")
 
 class SessionError(Exception):
@@ -65,7 +64,7 @@ class Session:
         self,
         user: User,
         available_llms: Dict[str, LLM],
-        provider: LLMProvider,
+        providers: Dict[str, LLMProvider],
         pipeline: Job | None = None,
         timeout: float = 300.0,
     ):
@@ -74,11 +73,11 @@ class Session:
         
         Args:
             user: The user to interact with
-            provider: The LLM provider to use
+            providers: The LLM providers to use
             timeout: Maximum execution time in seconds
         """
         self.user = user
-        self.provider = provider
+        self.providers = providers  
         self.timeout = timeout
         self.available_llms = available_llms
         self.pipeline = pipeline or default_pipeline()
@@ -92,6 +91,9 @@ class Session:
         self.logger.info("Session initialized with %d LLMs", len(self.available_llms))
         self.logger.debug("Available LLMs: %s", list(self.available_llms.keys()))
 
+
+    def total_cost(self) -> float:
+        return sum(provider.usage.total_cost() for provider in self.providers.values())
     
     async def run(self, prompt: Prompt) -> Dict[str, Any]:
         """
@@ -143,7 +145,7 @@ class Session:
             # Create and return final result
             result = self._create_result(final_context)
             self.logger.info("Session completed successfully")
-            self.logger.info("Total cost: $%.4f", self.provider.usage.totalCostUsd())
+            self.logger.info("Total cost: $%.4f", self.total_cost())
             return result
 
         except Exception as e:
@@ -160,7 +162,7 @@ class Session:
                 "status": "error",
                 "error": error_message,
                 "execution_time": duration,
-                "usage": self.provider.usage
+                "usage": self.total_cost()
             }
             
             # Re-raise with original message and context
@@ -197,7 +199,7 @@ class Session:
                 {}
             )
             
-        return Team(self.provider, llms)
+        return Team(self.providers, llms)
     
     async def _write_outputs(self, outputs: Dict[str, str]) -> None:
         """
@@ -268,7 +270,7 @@ class Session:
                 "review_count": len(context.reviews),
                 "file_count": len(context.outputs)
             },
-            "usage": self.provider.usage
+            "total_cost": self.total_cost()
         }
         
         self.logger.debug("Session results: %s", result)

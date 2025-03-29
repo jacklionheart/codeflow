@@ -9,12 +9,10 @@ class Team:
     A set of LLMs used to execute jobs.
     """
     
-    def __init__(self, provider: LLMProvider, llms: Dict[str, LLM]):
-        self.provider = provider
+    def __init__(self, providers: Dict[str, LLMProvider], llms: Dict[str, LLM]):
+        self.providers = providers
         self.llms = llms
 
-    def priorities(self, name: str) -> str:
-        return self.configs[name].priorities
     
     async def query_parallel(self, prompt_template: str, args: Dict[str, Any]) -> Dict[str, str]:
         tasks = []
@@ -37,6 +35,9 @@ class Team:
                 results[name] = response
         
         return results
+    
+    def total_cost(self) -> float:
+        return sum(provider.usage.total_cost() for provider in self.providers.values())
 
 
 class MateError(Exception):
@@ -53,11 +54,11 @@ class MateConfig:
     
     Attributes:
         name: Identifier for this team member
-        priorities: List of priorities this member specializes in
+        provider: The LLM provider to use
         system_prompt: The system prompt to use when creating this member's LLM
     """
     name: str
-    priorities: str
+    provider: str
     system_prompt: str
     
     @classmethod
@@ -66,7 +67,7 @@ class MateConfig:
         Create a MateConfig from a markdown file.
         
         The file should have sections for System Prompt,
-        and and Priorities.
+        and Provider.
         
         Args:
             path: Path to the markdown file
@@ -82,14 +83,14 @@ class MateConfig:
             sections = cls._parse_sections(content)
             
             # Required sections
-            if 'Priorities' not in sections:
-                raise MateError("Member file missing Priorities section")
+            if 'Provider' not in sections:
+                raise MateError("Member file missing Provider section")
             if 'System Prompt' not in sections:
                 raise MateError("Member file missing System Prompt section")
                 
             return cls(
                 name=path.stem,  # Use filename as identifier
-                priorities=sections['Priorities'].strip(),
+                provider=sections['Provider'].lower().strip(),
                 system_prompt=sections['System Prompt'].strip(),
             )
             

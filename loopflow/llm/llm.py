@@ -23,21 +23,20 @@ class UsageStats:
         input_tokens: Total tokens in prompts
         output_tokens: Total tokens in completions
     """    
-    # For now just using Claude-3.5 Sonnet pricing
+    # TODO: This isnt working
     usd_per_1000_input_tokens: float = 0.003
     usd_per_1000_output_tokens: float = 0.015
     input_tokens: int = 0
     output_tokens: int = 0
 
-    def totalCostUsd(self) -> float:
-        """Total cost in USD."""
-        return self.inputCostUsd() + self.outputCostUsd()
+    def total_cost(self) -> float:
+        return self.input_cost_usd() + self.output_cost_usd()
     
-    def inputCostUsd(self) -> float:
+    def input_cost_usd(self) -> float:
         """Cost in USD for input tokens."""
         return self.input_tokens * self.usd_per_1000_input_tokens / 1000
     
-    def outputCostUsd(self) -> float:
+    def output_cost_usd(self) -> float:
         """Cost in USD for output tokens."""
         return self.output_tokens * self.usd_per_1000_output_tokens / 1000
 
@@ -65,7 +64,7 @@ class LLMProvider(ABC):
         self.usage.track(input_tokens, output_tokens)
 
     @abstractmethod
-    def createLLM(self, name: str, system_prompt: str, priorities: str) -> "LLM":
+    def createLLM(self, name: str, system_prompt: str) -> "LLM":
         """Create a new model instance."""
         pass
 
@@ -81,9 +80,8 @@ class LLM(ABC):
     name: str
     system_prompt: str
     provider: LLMProvider
-    priorities: str
     
-    def __init__(self, name: str, provider: LLMProvider, system_prompt: str, priorities: str):
+    def __init__(self, name: str, provider: LLMProvider, system_prompt: str):
         """
         Initialize a model instance.
         
@@ -94,7 +92,6 @@ class LLM(ABC):
         self.provider = provider
         self.history: List[Interaction] = []
         self.system_prompt = system_prompt
-        self.priorities = priorities
     async def chat(self, prompt: str) -> str:
         """
         Send a message and get a response, maintaining conversation context.
