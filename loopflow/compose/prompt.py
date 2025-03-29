@@ -6,8 +6,7 @@ Parsing user prompt markdown files
 from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Optional
-from yaml.parser import ParserError
-from loopflow.file import resolve_codebase_path
+from loopflow.compose.file import resolve_codebase_path
 
 class PromptError(Exception):
     """Exception raised for errors in the prompt file."""

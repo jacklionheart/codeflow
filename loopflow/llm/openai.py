@@ -8,7 +8,6 @@ OpenAI's Chat API, with each instance maintaining its own conversation history.
 import asyncio
 from openai import AsyncOpenAI
 
-aclient = AsyncOpenAI(api_key=config["api_key"])
 from typing import Any, Dict, Tuple
 from .llm import LLMProvider, LLM, UsageStats, LLMError
 
@@ -25,6 +24,7 @@ class OpenAI(LLMProvider):
         self.max_retries = config.get("max_retries", 3)
         print(f"Initializing OpenAI provider with API key: {config}")
         print(f"OpenAI provider initialized with config: {config}")
+        self.aclient = AsyncOpenAI(api_key=config["api_key"])
 
     def createLLM(self, name: str, system_prompt: str) -> LLM:
         """Create a new OpenAI model instance."""
@@ -62,10 +62,10 @@ class GPT(LLM):
                 messages.append({"role": "assistant", "content": interaction.response})
             messages.append({"role": "user", "content": prompt})
 
-            # Use the model specified in the config; default to "o3-mini-high"
-            model = self.provider.config.get("model", "o3-mini-high")
+            # Use the model specified in the config; default to "gpt-4o"
+            model = self.provider.config.get("model", "gpt-4o")
 
-            response = await aclient.chat.completions.create(model=model,
+            response = await self.provider.aclient.chat.completions.create(model=model,
             messages=messages,
             max_tokens=4096,
             timeout=self.provider.timeout)

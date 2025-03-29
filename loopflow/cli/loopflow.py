@@ -14,9 +14,9 @@ from pathlib import Path
 import click
 from typing import Optional, Dict, Any, List
 
-from loopflow.prompt import Prompt
+from loopflow.compose.prompt import Prompt
 from loopflow.llm import LLMProvider, Anthropic, LLM, OpenAI
-from loopflow.session import Session, User
+from loopflow.compose.session import Session, User
 from loopflow.templates import load_all_teammates
 
 logger = logging.getLogger("loopflow.cli")

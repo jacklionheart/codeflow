@@ -5,14 +5,14 @@ from pathlib import Path
 from typing import Dict, Any
 from unittest.mock import AsyncMock
 
-from loopflow.workflow import (
+from loopflow.compose.workflow import (
     Sequential,
     Clarify, Draft, Review, Synthesize,
     default_pipeline, WorkflowError
 )
-from loopflow.prompt import Prompt
-from loopflow.team import Team
-from loopflow.workflow import WorkflowState
+from loopflow.compose.prompt import Prompt
+from loopflow.llm.team import Team
+from loopflow.compose.workflow import WorkflowState
 from .mock import MockProvider
 
 # -----------------------------------------------------------------------------

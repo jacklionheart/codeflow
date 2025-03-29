@@ -5,8 +5,8 @@ from pathlib import Path
 import tempfile
 import pytest
 
-from loopflow.session import Session, SessionError
-from loopflow.workflow import Job, WorkflowState
+from loopflow.compose.session import Session, SessionError
+from loopflow.compose.workflow import Job, WorkflowState
 from .mock import MockUser
 
 # -----------------------------------------------------------------------------

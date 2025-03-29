@@ -4,7 +4,7 @@ import pytest
 from pathlib import Path
 from textwrap import dedent
 
-from loopflow.prompt import Prompt
+from loopflow.compose.prompt import Prompt
 from .mock import MockUser, MockProvider
 
 @pytest.fixture

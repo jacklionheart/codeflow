@@ -15,9 +15,9 @@ from pathlib import Path
 from typing import Dict, List, Any
 
 from .prompt import Prompt
-from .team import Team    
-from .file import get_context
-from .templates import (
+from loopflow.llm.team import Team    
+from loopflow.compose.file import get_context
+from loopflow.templates import (
     QUESTION_TEMPLATE,
     DRAFT_TEMPLATE,
     REVIEW_TEMPLATE,
@@ -119,7 +119,7 @@ class Job(ABC):
 
 class Clarify(Job):
     async def execute(self, state: WorkflowState) -> WorkflowState:
-        logger = logging.getLogger("loopflow.workflow.clarify")
+        logger = logging.getLogger(__name__).getChild("clarify")
         logger.info("Starting clarification phase")
         start_time = datetime.now()
         
@@ -176,7 +176,7 @@ class Clarify(Job):
 
 class Draft(Job):
     async def execute(self, state: WorkflowState) -> WorkflowState:
-        logger = logging.getLogger("loopflow.workflow.draft")
+        logger = logging.getLogger(__name__).getChild("draft")
         logger.info("Starting draft generation phase")
         start_time = datetime.now()
         
@@ -253,7 +253,7 @@ class Draft(Job):
 
 class Review(Job):
     async def execute(self, state: WorkflowState) -> WorkflowState:
-        logger = logging.getLogger("loopflow.workflow.review")
+        logger = logging.getLogger(__name__).getChild("review")
         logger.info("Starting review phase")
         start_time = datetime.now()
         
@@ -331,7 +331,7 @@ class Review(Job):
 
 class Synthesize(Job):
     async def execute(self, state: WorkflowState) -> WorkflowState:
-        logger = logging.getLogger("loopflow.workflow.synthesize")
+        logger = logging.getLogger(__name__).getChild("synthesize")
         logger.info("Starting synthesis phase")
         start_time = datetime.now()
         
@@ -479,7 +479,7 @@ class Sequential(Job):
         self.jobs = jobs
     
     async def execute(self, state: WorkflowState) -> WorkflowState:
-        logger = logging.getLogger("loopflow.workflow.sequential")
+        logger = logging.getLogger(__name__).getChild("sequential")
         logger.info("Starting sequential pipeline with %d jobs", len(self.jobs))
         start_time = datetime.now()
         
@@ -523,7 +523,7 @@ def default_pipeline() -> Job:
         3. Review all drafts
         4. Synthesize final versions
     """
-    logger = logging.getLogger("loopflow.workflow")
+    logger = logging.getLogger(__name__)
     logger.debug("Creating default pipeline")
     pipeline = Sequential([
         Clarify(),
