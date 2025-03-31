@@ -8,7 +8,7 @@ import os
 import subprocess
 from pathlib import Path
 from typing import Tuple
-from loopflow.compose.file import get_context
+from loopflow.io.file import get_context
 
 import click
 

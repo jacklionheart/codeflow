@@ -11,13 +11,12 @@ import asyncio
 import logging
 import os
 import yaml
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, Optional, Any, List, Union
+from typing import Dict, Optional, Any, List, Union, Callable
 
 from loopflow.llm import LLMProvider, LLM, Anthropic, OpenAI
-from loopflow.edit.team import Team
-from loopflow.templates import load_all_teammates
 
 logger = logging.getLogger(__name__)
 
@@ -32,22 +31,21 @@ class SessionError(Exception):
         self.context = context
         super().__init__(f"Session failed: {message}")
 
-class User:
+class User(ABC):
     """
-    Represents the human user interacting with the session.
+    Interface for interacting with users across different platforms.
     
-    This base class handles CLI interactions. It can be extended to support 
-    other interfaces like Discord.
+    This abstract base class defines the contract that all user implementations
+    must fulfill, allowing for consistent interaction regardless of platform.
     """
     def __init__(self, name: str = "user"):
         self.name = name
         self.logger = logging.getLogger(__name__).getChild("user")
-
+    
+    @abstractmethod
     async def chat(self, prompt: str) -> str:
         """
         Chat with the user and return their response.
-        
-        This implementation uses the CLI for interaction.
         
         Args:
             prompt: The prompt to show to the user
@@ -55,7 +53,32 @@ class User:
         Returns:
             The user's response text
         """
-        self.logger.info("Requesting user input")
+        pass
+    
+    @abstractmethod
+    async def show_message(self, message: str) -> None:
+        """
+        Display a message to the user without expecting a response.
+        
+        Args:
+            message: The message to display
+        """
+        pass
+
+class CLIUser(User):
+    """Implementation of User interface for command-line interactions."""
+    
+    async def chat(self, prompt: str) -> str:
+        """
+        Chat with the user via command line and return their response.
+        
+        Args:
+            prompt: The prompt to show to the user
+            
+        Returns:
+            The user's response text
+        """
+        self.logger.info("Requesting user input via CLI")
         self.logger.debug("User prompt: %s", prompt)
         print("\n" + prompt + "\n")
         response = input("Your response: ")
@@ -64,12 +87,102 @@ class User:
     
     async def show_message(self, message: str) -> None:
         """
-        Display a message to the user without expecting a response.
+        Display a message to the user on the command line.
         
         Args:
             message: The message to display
         """
         print("\n" + message + "\n")
+
+class DiscordUser(User):
+    """Implementation of User interface for Discord interactions."""
+    
+    def __init__(
+        self, 
+        name: str, 
+        channel_id: str, 
+        user_id: str, 
+        message_callback: Callable[[str, str], Any]
+    ):
+        """
+        Initialize a Discord user.
+        
+        Args:
+            name: User's display name
+            channel_id: Discord channel ID for this conversation
+            user_id: Discord user ID
+            message_callback: Callback function to send messages to Discord
+        """
+        super().__init__(name)
+        self.channel_id = channel_id
+        self.user_id = user_id
+        self.send_message = message_callback
+        self.pending_responses = {}
+        self.logger = logging.getLogger(f"loopflow.user.discord.{user_id}")
+    
+    async def chat(self, prompt: str) -> str:
+        """
+        Chat with the user via Discord and wait for their response.
+        
+        This method sends a message to Discord and creates a Future to await
+        the user's response. The response will be set when the user replies.
+        
+        Args:
+            prompt: The prompt to show to the user
+            
+        Returns:
+            The user's response text
+        """
+        self.logger.info(f"Requesting input from Discord user {self.name}")
+        
+        # Create a future to await the response
+        response_future = asyncio.Future()
+        self.pending_responses[self.channel_id] = response_future
+        
+        # Send the message to Discord
+        await self.send_message(self.channel_id, prompt)
+        
+        # Wait for the response (will be set by handle_response)
+        try:
+            response = await response_future
+            self.logger.debug(f"Received response from Discord user: {response[:50]}...")
+            return response
+        except asyncio.CancelledError:
+            self.logger.warning("Request for user input was cancelled")
+            if self.channel_id in self.pending_responses:
+                del self.pending_responses[self.channel_id]
+            raise
+    
+    async def show_message(self, message: str) -> None:
+        """
+        Display a message to the user on Discord without expecting a response.
+        
+        Args:
+            message: The message to display
+        """
+        await self.send_message(self.channel_id, message)
+    
+    def handle_response(self, channel_id: str, message: str) -> bool:
+        """
+        Handle an incoming response from Discord.
+        
+        This method should be called when a message is received from the user
+        that might be a response to a pending chat request.
+        
+        Args:
+            channel_id: Discord channel ID where the message was sent
+            message: The message content
+            
+        Returns:
+            True if this message satisfied a pending response, False otherwise
+        """
+        if channel_id in self.pending_responses:
+            future = self.pending_responses[channel_id]
+            if not future.done():
+                future.set_result(message)
+                del self.pending_responses[channel_id]
+                return True
+        return False
 
 @dataclass
 class Config:
@@ -89,17 +202,17 @@ class Session:
     
     def __init__(
         self,
-        user: User,
+        user: Optional[User] = None,
         config: Optional[Config] = None,
     ):
         """
         Initialize session with its configuration.
         
         Args:
-            user: The user interacting with the session
+            user: The user interacting with the session (optional, defaults to CLIUser)
             config: Configuration options (optional)
         """
-        self.user = user
+        self.user = user if user is not None else CLIUser()
         self.config = config or Config()
         self.logger = logging.getLogger("loopflow.session")
         self.providers: Dict[str, LLMProvider] = {}
@@ -192,6 +305,7 @@ class Session:
         self.logger.debug("Loading teammate configurations")
         
         # Load teammate definitions
+        from loopflow.templates import load_all_teammates
         teammates = load_all_teammates()
         self.logger.info(f"Loaded {len(teammates)} teammate configurations")
         
@@ -212,7 +326,7 @@ class Session:
             self.available_llms[name] = llm
             self.logger.debug(f"Created LLM for teammate: {name}")
     
-    def setup_team(self, team_names: List[str]) -> Team:
+    def setup_team(self, team_names: List[str]) -> 'Team':
         """
         Create a Team object with the specified team members.
         
@@ -244,6 +358,7 @@ class Session:
                 {"requested": team_names, "available": available}
             )
         
+        from loopflow.edit.team import Team
         return Team(self.providers, llms)
     
     def get_llm(self, name: str) -> LLM:

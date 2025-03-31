@@ -3,7 +3,7 @@ from pathlib import Path
 from unittest.mock import AsyncMock, patch
 from typing import Dict, Any
 
-from loopflow.llm.team import Team, MateConfig, MateError
+from loopflow.llm.mate import MateConfig, MateError, Team
 from loopflow.llm import LLM
 from tests.mock import MockProvider
 

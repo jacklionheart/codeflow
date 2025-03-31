@@ -5,11 +5,11 @@ This module provides the concrete implementation for interacting with
 Anthropic's Claude model, with each instance maintaining its own chat context.
 """
 
-from dataclasses import dataclass
-from typing import List, Dict, Tuple
 import asyncio
+from dataclasses import dataclass
+from typing import Any, Dict, List, Tuple
+
 import anthropic
-from typing import Any
 
 from .llm import LLMProvider, LLM, UsageStats, LLMError
 

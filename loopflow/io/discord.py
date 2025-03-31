@@ -9,11 +9,12 @@ import asyncio
 import logging
 import os
 import yaml
-from flask import Flask, request, jsonify
 from pathlib import Path
-from typing import Dict, List, Optional, Any, Union
+from typing import Any, Dict, List, Optional, Union
 
-from loopflow.bot import DiscordBot
+from flask import Flask, jsonify, request
+
+from loopflow.chat.bot import DiscordBot
 from loopflow.llm import LLMProvider, LLM
 from loopflow.templates import load_all_teammates
 
@@ -206,16 +207,3 @@ class LoopflowServer:
         self.setup_bots()
         self.logger.info(f"Starting loopflow-server on {host}:{port}")
         self.flask_app.run(host=host, port=port, debug=debug)
-
-def setup_discord_server(providers: Dict[str, LLMProvider]) -> LoopflowServer:
-    """
-    Set up the loopflow Discord server.
-    
-    Args:
-        providers: Dictionary of LLM providers
-        
-    Returns:
-        Configured LoopflowServer instance
-    """
-    server = LoopflowServer(providers)
-    return server

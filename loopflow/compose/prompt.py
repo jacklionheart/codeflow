@@ -6,7 +6,7 @@ Parsing user prompt markdown files
 from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Optional
-from loopflow.compose.file import resolve_codebase_path
+from loopflow.io.file import resolve_codebase_path
 
 class PromptError(Exception):
     """Exception raised for errors in the prompt file."""
@@ -18,6 +18,7 @@ class Prompt:
     """Represents a parsed loopflow prompt file."""
     def __init__(
         self, 
+        root: Path,
         goal: str,
         output_files: List[str | Path],
         team: List[str],
@@ -29,14 +30,14 @@ class Prompt:
         if not output_files:
             raise PromptError("At least one output file is required")
         if not team:
-            raise PromptError("At least one team member is required")
+            team=["maya", "merlin"]
 
         self.goal = goal.strip()
         
         # Resolve output file paths
         try:
             self.output_files = [
-                resolve_codebase_path(p, for_reading=False) 
+                resolve_codebase_path(p, root=root, for_reading=False) 
                 for p in output_files
             ]
         except ValueError as e:
@@ -47,7 +48,7 @@ class Prompt:
         if context_files:
             try:
                 self.context_files = [
-                    resolve_codebase_path(p, for_reading=True)
+                    resolve_codebase_path(p, root=root, for_reading=True)
                     for p in context_files
                 ]
             except ValueError as e:
@@ -106,6 +107,7 @@ class Prompt:
                 goal=sections['Goal'].strip(),
                 output_files=output_files,
                 team=team,
+                root=path.parent,
                 context_files=context_files
             )
         except Exception as e:

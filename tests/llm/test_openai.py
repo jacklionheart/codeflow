@@ -32,7 +32,7 @@ def mock_response():
 
 @pytest.mark.asyncio
 async def test_openai_chat_success(config, mock_response):
-    with patch("openai.resources.chat.Completions.acreate", new_callable=AsyncMock) as mock_acreate:
+    with patch("openai.resources.chat.Completions.create", new_callable=AsyncMock) as mock_acreate:
         mock_acreate.return_value = mock_response
 
         provider = OpenAI(config)
@@ -52,7 +52,7 @@ async def test_openai_chat_success(config, mock_response):
 
 @pytest.mark.asyncio
 async def test_openai_conversation_history(config, mock_response):
-    with patch("openai.resources.chat.Completions.acreate", new_callable=AsyncMock) as mock_acreate:
+    with patch("openai.resources.chat.Completions.create", new_callable=AsyncMock) as mock_acreate:
         mock_acreate.return_value = mock_response
 
         provider = OpenAI(config)
@@ -90,7 +90,7 @@ async def test_openai_token_tracking(config):
         }
     }
 
-    with patch("openai.resources.chat.Completions.acreate", new_callable=AsyncMock) as mock_acreate:
+    with patch("openai.resources.chat.Completions.create", new_callable=AsyncMock) as mock_acreate:
         mock_acreate.side_effect = [response1, response2]
 
         provider = OpenAI(config)
@@ -105,7 +105,7 @@ async def test_openai_token_tracking(config):
 
 @pytest.mark.asyncio
 async def test_openai_error_handling(config):
-    with patch("openai.resources.chat.Completions.acreate", new_callable=AsyncMock) as mock_acreate:
+    with patch("openai.resources.chat.Completions.create", new_callable=AsyncMock) as mock_acreate:
         mock_acreate.side_effect = Exception("API Error")
 
         provider = OpenAI(config)
@@ -123,7 +123,7 @@ async def test_openai_timeout(config):
         await asyncio.sleep(0.2)  # simulate delay beyond the timeout
         raise asyncio.TimeoutError("Operation timed out")
 
-    with patch("openai.resources.chat.Completions.acreate", new_callable=AsyncMock) as mock_acreate:
+    with patch("openai.resources.chat.Completions.create", new_callable=AsyncMock) as mock_acreate:
         mock_acreate.side_effect = slow_response
 
         test_config = {

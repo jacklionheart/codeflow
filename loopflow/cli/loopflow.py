@@ -4,20 +4,26 @@ Command-line interface for loopflow.
 
 This module provides the main entry points for running loopflow from the
 command line. It handles command parsing, configuration loading, and
-execution setup while delegating the actual work to the Session class.
+execution setup while delegating the actual work to the pipelines.
 """
 
 import asyncio
 import logging
 import os
+import yaml
 from pathlib import Path
 import click
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any, Tuple
 
+from loopflow.io.session import Session, Config, CLIUser
 from loopflow.compose.prompt import Prompt
-from loopflow.llm import LLMProvider, Anthropic, LLM, OpenAI
-from loopflow.compose.session import Session, User
-from loopflow.templates import load_all_teammates
+from loopflow.compose.pipeline import (
+    ClarifyPipeline, 
+    MatePipeline, 
+    TeamPipeline, 
+    ReviewPipeline,
+)
+from loopflow.io.git import auto_checkpoint, find_last_non_loopflow_commit, rebase_to_commit
 
 logger = logging.getLogger("loopflow.cli")
 
@@ -25,41 +31,67 @@ class ConfigError(Exception):
     """Exception raised for configuration errors."""
     pass
 
-def setup_providers() -> Dict[str, LLMProvider]:
-    logger.debug("Setting up LLM provider")
+class ProjectError(Exception):
+    """Exception raised for project structure errors."""
+    pass
 
-    providers = {}
-
-    if "ANTHROPIC_API_KEY" in os.environ:
-        logger.info("Creating Anthropic provider")
-        config = {
-            "api_key": os.environ["ANTHROPIC_API_KEY"],
-        }
-        providers["anthropic"] = Anthropic(config)
-
-    if "OPENAI_API_KEY" in os.environ:     
-        logger.info("Creating OpenAI provider")
-        config = {
-            "api_key": os.environ["OPENAI_API_KEY"],
-        }
-        providers["openai"] = OpenAI(config)
-
-    if len(providers) == 0:
-        logger.error("No valid LLM providers found; set ANTHROPIC_API_KEY and/or OPENAI_API_KEY")
-        raise ConfigError("No valid LLM provider configured")
-
-    return providers
-
-def load_llms(providers: Dict[str, LLMProvider], teammates: Dict[str, Any]) -> Dict[str, LLM]:
-    logger.debug("Loading LLMs for team members: %s", list(teammates.keys()))
-    llms = {}
-    for name, mate in teammates.items():
-        logger.debug("Creating LLM for team member: %s", name)
-        llms[name] = providers[mate.provider].createLLM(
-            name=name,
-            system_prompt=mate.system_prompt,
+def find_loopflow_file(project_dir: Path) -> Path:
+    """
+    Find the loopflow.md file in the project directory.
+    
+    Args:
+        project_dir: Directory to search in
+        
+    Returns:
+        Path to the loopflow.md file
+        
+    Raises:
+        ProjectError: If loopflow.md file is not found
+    """
+    loopflow_file = project_dir / "loopflow.md"
+    
+    if not loopflow_file.exists():
+        raise ProjectError(
+            f"loopflow.md not found in {project_dir}. "
+            f"Run 'loopflow init {project_dir}' to create a new project."
         )
-    return llms
+    
+    return loopflow_file
+
+def setup_logging(debug: bool) -> None:
+    """Configure logging with appropriate level and format."""
+    log_level = logging.DEBUG if debug else logging.INFO
+    logging.basicConfig(
+        level=log_level,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S'
+    )
+    logging.getLogger().setLevel(logging.INFO)
+    logger = logging.getLogger("loopflow")
+    logger.setLevel(log_level)
+
+def create_session(config_path: Optional[Path], debug: bool) -> Tuple[Session, Dict[str, Any]]:
+    """Create a session with the provided configuration."""
+    config_obj = Config(
+        config_path=config_path,
+        anthropic_api_key=os.environ.get("ANTHROPIC_API_KEY"),
+        openai_api_key=os.environ.get("OPENAI_API_KEY"),
+        debug=debug
+    )
+    
+    user = CLIUser()
+    session = Session(user, config_obj)
+    
+    # Load git configuration
+    config_data = {}
+    if config_path and config_path.exists():
+        try:
+            with open(config_path, 'r') as f:
+                config_data = yaml.safe_load(f) or {}
+        except Exception as e:
+            logger.warning(f"Error loading config file: {e}")
+    
+    return session, config_data
 
 @click.group()
 def cli():
@@ -67,75 +99,208 @@ def cli():
     pass
 
 @cli.command()
-@click.argument('prompt_file', type=click.Path(exists=True, path_type=Path))
+@click.argument('project_dir', type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path))
 @click.option('--config', '-c', type=click.Path(exists=True, path_type=Path),
               help='Path to config file (default: ~/.loopflow/config.yaml)')
 @click.option('--debug', '-d', is_flag=True, help='Enable debug logging')
-def run(prompt_file: Path, config: Optional[Path], debug: bool):
-    """Run a loopflow prompt file."""
+@click.option('--checkpoint/--no-checkpoint', default=True, help='Enable/disable auto git checkpointing')
+def clarify(project_dir: Path, config: Optional[Path], debug: bool, checkpoint: bool):
+    """Generate questions to clarify requirements."""
     try:
-        # Configure logging
-        log_level = logging.DEBUG if debug else logging.INFO
-        logging.basicConfig(
-            level=log_level,
-            format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-            datefmt='%Y-%m-%d %H:%M:%S'
-        )
-        logging.getLogger().setLevel(logging.INFO)
-        logger = logging.getLogger("loopflow")
-        logger.setLevel(log_level)
+        setup_logging(debug)
+        logger.info("Starting clarify with project directory: %s", project_dir)
         
-        logger.info("Starting loopflow run with prompt file: %s", prompt_file)
-        
-        # Parse prompt and configuration
+        # Find and parse loopflow.md
+        prompt_file = find_loopflow_file(project_dir)
         prompt = Prompt.from_file(prompt_file)
-        logger.info("Prompt parsed and validated successfully")
+        logger.info("Prompt parsed successfully from %s", prompt_file)
         
-        providers = setup_providers()
+        # Create session and pipeline
+        session, config_data = create_session(config, debug)
+        pipeline = ClarifyPipeline(session, prompt)
         
-        if debug:
-            click.echo(f"Parsed prompt from {prompt_file}")
-            click.echo(f"Goal: {prompt.goal}")
-            click.echo(f"Output files: {', '.join(map(str, prompt.output_files))}")
-            if prompt.context_files:
-                click.echo(f"Context files: {', '.join(map(str, prompt.context_files))}")
+        # Execute pipeline
+        result = asyncio.run(pipeline.execute())
         
-        # Create and run session
-        user = User()
-        logger.debug("Loading team members")
-        teammates = load_all_teammates()
+        # Auto-checkpoint if enabled
+        if checkpoint:
+            details = {
+                "questions": len(result.get("questions", {}))
+            }
+            auto_checkpoint(project_dir, "clarify", config_data, details)
         
-        logger.info("Creating session")
-        session = Session(
-            user=user,
-            available_llms=load_llms(providers, teammates),
-            providers=providers
-        )
-        
-        logger.info("Running session")
-        result = asyncio.run(session.run(prompt))
-        
-        if debug:
-            click.echo("\nExecution complete:")
-            click.echo(f"Duration: {result['execution_time']:.1f}s")
-            click.echo(f"Files generated: {result['metrics']['file_count']}")
-            click.echo(f"Total cost: ${result['usage'].totalCostUsd():.4f}")
-        
-        logger.info("Run completed successfully")
+        # Display results
+        if result["status"] == "success":
+            click.echo("Questions have been appended to the prompt file.")
+            click.echo("Please add your answers and then run 'loopflow team' or 'loopflow mate'.")
+        else:
+            click.echo(f"Error: {result.get('error', 'Unknown error')}", err=True)
+            if debug and 'context' in result:
+                click.echo(f"Context: {result['context']}")
             
+        logger.info("Clarify completed with status: %s", result["status"])
+        
     except Exception as e:
-        logger.error("Run failed: %s", str(e), exc_info=debug)
+        logger.error("Clarify failed: %s", str(e), exc_info=debug)
         click.echo(f"Error: {str(e)}", err=True)
         raise click.Abort()
 
 @cli.command()
-@click.argument('output_dir', type=click.Path(path_type=Path))
-def init(output_dir: Path):
-    """Initialize a new loopflow prompt file."""
-    logger.info("Initializing new prompt file in: %s", output_dir)
+@click.argument('project_dir', type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path))
+@click.option('--config', '-c', type=click.Path(exists=True, path_type=Path),
+              help='Path to config file (default: ~/.loopflow/config.yaml)')
+@click.option('--mate', '-m', help='Specific mate to use (default: first mate in prompt)')
+@click.option('--debug', '-d', is_flag=True, help='Enable debug logging')
+@click.option('--checkpoint/--no-checkpoint', default=True, help='Enable/disable auto git checkpointing')
+def mate(project_dir: Path, config: Optional[Path], mate: Optional[str], debug: bool, checkpoint: bool):
+    """Generate drafts with a specific mate."""
+    try:
+        setup_logging(debug)
+        logger.info("Starting mate with project directory: %s", project_dir)
+        
+        # Find and parse loopflow.md
+        prompt_file = find_loopflow_file(project_dir)
+        prompt = Prompt.from_file(prompt_file)
+        logger.info("Prompt parsed successfully from %s", prompt_file)
+        
+        # Create session and pipeline
+        session, config_data = create_session(config, debug)
+        pipeline = MatePipeline(session, prompt, mate_name=mate)
+        
+        # Execute pipeline
+        result = asyncio.run(pipeline.execute())
+        
+        # Auto-checkpoint if enabled
+        if checkpoint:
+            details = {
+                "mate": result.get("mate", "unknown"),
+                "files": len(result.get("outputs", {}))
+            }
+            auto_checkpoint(project_dir, "mate", config_data, details)
+        
+        # Display results
+        if result["status"] == "success":
+            click.echo(f"Generated {len(result.get('outputs', {}))} files with mate: {result.get('mate', 'unknown')}")
+            for path, content in result.get('outputs', {}).items():
+                click.echo(f"  - {path}: {len(content)} chars")
+        else:
+            click.echo(f"Error: {result.get('error', 'Unknown error')}", err=True)
+            if debug and 'context' in result:
+                click.echo(f"Context: {result['context']}")
+        
+        logger.info("Mate completed with status: %s", result["status"])
+        
+    except Exception as e:
+        logger.error("Mate failed: %s", str(e), exc_info=debug)
+        click.echo(f"Error: {str(e)}", err=True)
+        raise click.Abort()
+
+@cli.command()
+@click.argument('project_dir', type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path))
+@click.option('--config', '-c', type=click.Path(exists=True, path_type=Path),
+              help='Path to config file (default: ~/.loopflow/config.yaml)')
+@click.option('--debug', '-d', is_flag=True, help='Enable debug logging')
+@click.option('--checkpoint/--no-checkpoint', default=True, help='Enable/disable auto git checkpointing')
+def team(project_dir: Path, config: Optional[Path], debug: bool, checkpoint: bool):
+    """Run the full team workflow (draft, review, synthesize)."""
+    try:
+        setup_logging(debug)
+        logger.info("Starting team workflow with project directory: %s", project_dir)
+        
+        # Find and parse loopflow.md
+        prompt_file = find_loopflow_file(project_dir)
+        prompt = Prompt.from_file(prompt_file)
+        logger.info("Prompt parsed successfully from %s", prompt_file)
+        
+        # Create session and pipeline
+        session, config_data = create_session(config, debug)
+        pipeline = TeamPipeline(session, prompt)
+        
+        # Execute pipeline
+        result = asyncio.run(pipeline.execute())
+        
+        # Auto-checkpoint if enabled
+        if checkpoint:
+            details = {
+                "team": ",".join(result.get("team", [])),
+                "files": len(result.get("outputs", {}))
+            }
+            auto_checkpoint(project_dir, "team", config_data, details)
+        
+        # Display results
+        if result["status"] == "success":
+            click.echo(f"Generated {len(result.get('outputs', {}))} files using team: {', '.join(result.get('team', []))}")
+            for path, _ in result.get('outputs', {}).items():
+                click.echo(f"  - {path}")
+        else:
+            click.echo(f"Error: {result.get('error', 'Unknown error')}", err=True)
+            if debug and 'context' in result:
+                click.echo(f"Context: {result['context']}")
+        
+        logger.info("Team workflow completed with status: %s", result["status"])
+        
+    except Exception as e:
+        logger.error("Team workflow failed: %s", str(e), exc_info=debug)
+        click.echo(f"Error: {str(e)}", err=True)
+        raise click.Abort()
+
+@cli.command()
+@click.argument('project_dir', type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path))
+@click.option('--config', '-c', type=click.Path(exists=True, path_type=Path),
+              help='Path to config file (default: ~/.loopflow/config.yaml)')
+@click.option('--debug', '-d', is_flag=True, help='Enable debug logging')
+@click.option('--checkpoint/--no-checkpoint', default=True, help='Enable/disable auto git checkpointing')
+def review(project_dir: Path, config: Optional[Path], debug: bool, checkpoint: bool):
+    """Review existing files and append feedback to the prompt."""
+    try:
+        setup_logging(debug)
+        logger.info("Starting review with project directory: %s", project_dir)
+        
+        # Find and parse loopflow.md
+        prompt_file = find_loopflow_file(project_dir)
+        prompt = Prompt.from_file(prompt_file)
+        logger.info("Prompt parsed successfully from %s", prompt_file)
+        
+        # Create session and pipeline
+        session, config_data = create_session(config, debug)
+        pipeline = ReviewPipeline(session, prompt)
+        
+        # Execute pipeline
+        result = asyncio.run(pipeline.execute())
+        
+        # Auto-checkpoint if enabled
+        if checkpoint:
+            details = {
+                "team": ",".join(result.get("team", [])),
+                "files_reviewed": len(result.get("files_reviewed", []))
+            }
+            auto_checkpoint(project_dir, "review", config_data, details)
+        
+        # Display results
+        if result["status"] == "success":
+            click.echo(f"Reviewed {len(result.get('files_reviewed', []))} files using team: {', '.join(result.get('team', []))}")
+            click.echo("Reviews have been appended to the prompt file.")
+        else:
+            click.echo(f"Error: {result.get('error', 'Unknown error')}", err=True)
+            if debug and 'context' in result:
+                click.echo(f"Context: {result['context']}")
+        
+        logger.info("Review completed with status: %s", result["status"])
+        
+    except Exception as e:
+        logger.error("Review failed: %s", str(e), exc_info=debug)
+        click.echo(f"Error: {str(e)}", err=True)
+        raise click.Abort()
+
+@cli.command()
+@click.argument('project_dir', type=click.Path(path_type=Path))
+@click.option('--checkpoint/--no-checkpoint', default=True, help='Enable/disable auto git checkpointing')
+def init(project_dir: Path, checkpoint: bool):
+    """Initialize a new loopflow project directory."""
+    logger.info("Initializing new loopflow project in: %s", project_dir)
     
-    output_dir.mkdir(parents=True, exist_ok=True)
-    prompt_path = output_dir / "prompt.md"
+    project_dir.mkdir(parents=True, exist_ok=True)
+    prompt_path = project_dir / "loopflow.md"
     
     template = """# New Project
 
@@ -143,20 +308,63 @@ def init(output_dir: Path):
 Describe what needs to be built here.
 
 ## Output
-output/file1.py
-output/file2.py
+src/file1.py
+src/file2.py
 
 ## Context
-context_dir
+.
 
 ## Team
-- ML Researcher
-- Engineer
+maya
+merlin
 """
     
     prompt_path.write_text(template)
-    logger.info("Created new prompt file at: %s", prompt_path)
-    click.echo(f"Created new prompt file at {prompt_path}")
+    logger.info("Created new loopflow file at: %s", prompt_path)
+    click.echo(f"Created new loopflow project in {project_dir}")
+    click.echo(f"Created loopflow.md configuration file at {prompt_path}")
+    
+    # Create src directory
+    src_dir = project_dir / "src"
+    src_dir.mkdir(exist_ok=True)
+    click.echo(f"Created src directory at {src_dir}")
+    
+    # Auto-checkpoint if enabled and in a git repo
+    if checkpoint:
+        # Load an empty config
+        config_data = {}
+        auto_checkpoint(project_dir, "init", config_data, {"files": ["loopflow.md"]})
+
+@cli.command()
+@click.argument('project_dir', type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path))
+def rebase(project_dir: Path):
+    """Rebase to before loopflow checkpoints."""
+    try:
+        logger.info("Looking for last non-loopflow commit")
+        
+        # Find the last non-loopflow commit
+        commit_hash = find_last_non_loopflow_commit(project_dir)
+        if not commit_hash:
+            click.echo("No non-loopflow commits found. Repository may be new or completely made with loopflow.")
+            return
+            
+        # Confirm with user
+        click.echo(f"Found last non-loopflow commit: {commit_hash[:8]}")
+        if not click.confirm("Rebase to this commit? This will remove all loopflow checkpoint commits but preserve your changes."):
+            click.echo("Rebase cancelled.")
+            return
+            
+        # Perform the rebase
+        if rebase_to_commit(project_dir, commit_hash):
+            click.echo(f"Successfully rebased to commit {commit_hash[:8]}")
+            click.echo("All loopflow checkpoint commits have been squashed, but your changes are preserved.")
+        else:
+            click.echo("Rebase failed. You may need to resolve conflicts manually.")
+            
+    except Exception as e:
+        logger.error(f"Rebase failed: {str(e)}")
+        click.echo(f"Error: {str(e)}", err=True)
+        raise click.Abort()
 
 if __name__ == '__main__':
     cli()

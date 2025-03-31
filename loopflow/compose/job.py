@@ -9,12 +9,12 @@ reviewing content, or synthesizing final outputs.
 import logging
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Dict, List, Any, Optional, Union, Set
+from typing import Any, Dict, List, Optional, Set, Union
 
-from loopflow.edit.prompt import Prompt
-from loopflow.edit.file import get_context
-from loopflow.edit.team import Team
-from loopflow.session import Session
+from loopflow.compose.prompt import Prompt
+from loopflow.io.file import get_context
+from loopflow.llm.mate import Team
+from loopflow.io.session import Session
 from loopflow.templates import (
     QUESTION_TEMPLATE,
     DRAFT_TEMPLATE,

@@ -14,9 +14,9 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, Any, Optional
 
-from loopflow.edit.prompt import Prompt
-from loopflow.session import Session
-from loopflow.job import Clarify, Draft, Review, Synthesize, JobError
+from loopflow.compose.prompt import Prompt
+from loopflow.io.session import Session
+from loopflow.compose.job import Clarify, Draft, Review, Synthesize, JobError
 
 logger = logging.getLogger(__name__)
 
@@ -463,4 +463,4 @@ class TeamPipeline(Pipeline):
             return self._format_result("error", {
                 "error": str(e),
                 "team": self.prompt.team
-            })
+            })  

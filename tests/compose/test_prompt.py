@@ -7,12 +7,16 @@ from pathlib import Path
 from typing import List
 from unittest.mock import patch
 from loopflow.compose.prompt import Prompt, PromptError
-from loopflow.compose.file import resolve_codebase_path
+from loopflow.io.file import resolve_codebase_path
+
+@pytest.fixture(autouse=True)
+def set_code_context_root(monkeypatch):
+    monkeypatch.setenv("CODE_CONTEXT_ROOT", "/mock/root")
 
 @pytest.fixture
 def mock_resolve():
     """Provide mocked path resolution with consistent behavior."""
-    with patch('loopflow.run.file.resolve_codebase_path') as mock:
+    with patch('loopflow.compose.file.resolve_codebase_path') as mock:
         mock.return_value = Path('/mock/root/path').resolve()
         yield mock
 
@@ -40,7 +44,7 @@ src/lib/
 @pytest.fixture
 def mock_resolve_ok():
     """Provide mocked path resolution with consistent behavior."""
-    with patch('loopflow.run.file.resolve_codebase_path') as mock:
+    with patch('loopflow.compose.file.resolve_codebase_path') as mock:
         mock.side_effect = lambda p, **kwargs: (
             p if isinstance(p, Path) and p.is_absolute()
             else Path('/mock/root') / str(p)
@@ -66,7 +70,7 @@ def test_prompt_path_resolution(mock_resolve_ok):
 ])
 def test_prompt_invalid_paths(invalid_input):
     """Test handling of invalid paths."""
-    with patch('loopflow.run.prompt.resolve_codebase_path') as mock:
+    with patch('loopflow.compose.prompt.resolve_codebase_path') as mock:
         mock.side_effect = ValueError("Invalid path")
         with pytest.raises(PromptError, match="Invalid.*path"):
             Prompt(
@@ -152,6 +156,6 @@ reviewer2
     prompt_file = tmp_path / "test.md"
     prompt_file.write_text(content)
     
-    with patch('loopflow.run.prompt.resolve_codebase_path'):
+    with patch('loopflow.compose.prompt.resolve_codebase_path'):
         prompt = Prompt.from_file(prompt_file)
         assert set(prompt.team) == {"reviewer1", "reviewer2", "reviewer3"}

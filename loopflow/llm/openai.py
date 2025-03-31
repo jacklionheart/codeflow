@@ -6,10 +6,11 @@ OpenAI's Chat API, with each instance maintaining its own conversation history.
 """
 
 import asyncio
+from typing import Any, Dict, Tuple
+
 from openai import AsyncOpenAI
 
-from typing import Any, Dict, Tuple
-from .llm import LLMProvider, LLM, UsageStats, LLMError
+from .llm import LLM, LLMError, LLMProvider, UsageStats
 
 class OpenAI(LLMProvider):
     """Provider implementation for OpenAI's Chat API."""
