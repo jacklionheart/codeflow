@@ -122,16 +122,16 @@ def clarify(project_dir: Path, config: Optional[Path], debug: bool, checkpoint: 
         session, config_data = create_session(config, debug)
         pipeline = ClarifyPipeline(session, prompt)
         
-        # Execute pipeline
-        result = asyncio.run(pipeline.execute())
-        
         # Auto-checkpoint if enabled
         if checkpoint:
             details = {
                 "questions": len(result.get("questions", {}))
             }
             auto_checkpoint(project_dir, "clarify", details)
-        
+
+        # Execute pipeline
+        result = asyncio.run(pipeline.execute())
+                
         # Display results
         if result["status"] == "success":
             click.echo("Questions have been appended to the prompt file.")
@@ -169,13 +169,6 @@ def mate(project_dir: Path, config: Optional[Path], mate: Optional[str], debug: 
         prompt = Prompt.from_file(prompt_file)
         logger.info("Prompt parsed successfully from %s", prompt_file)
         
-        # Create session and pipeline
-        session, config_data = create_session(config, debug)
-        pipeline = MatePipeline(session, prompt, mate_name=mate)
-        
-        # Execute pipeline
-        result = asyncio.run(pipeline.execute())
-        
         # Auto-checkpoint if enabled
         if checkpoint:
             details = {
@@ -184,6 +177,13 @@ def mate(project_dir: Path, config: Optional[Path], mate: Optional[str], debug: 
             }
             auto_checkpoint(project_dir, "mate", details)
         
+        # Create session and pipeline
+        session, config_data = create_session(config, debug)
+        pipeline = MatePipeline(session, prompt, mate_name=mate)
+        
+        # Execute pipeline
+        result = asyncio.run(pipeline.execute())
+                
         # Display results
         if result["status"] == "success":
             click.echo(f"Generated {len(result.get('outputs', {}))} files with mate: {result.get('mate', 'unknown')}")
@@ -221,13 +221,6 @@ def team(project_dir: Path, config: Optional[Path], debug: bool, checkpoint: boo
         prompt = Prompt.from_file(prompt_file)
         logger.info("Prompt parsed successfully from %s", prompt_file)
         
-        # Create session and pipeline
-        session, config_data = create_session(config, debug)
-        pipeline = TeamPipeline(session, prompt)
-        
-        # Execute pipeline
-        result = asyncio.run(pipeline.execute())
-        
         # Auto-checkpoint if enabled
         if checkpoint:
             details = {
@@ -235,7 +228,14 @@ def team(project_dir: Path, config: Optional[Path], debug: bool, checkpoint: boo
                 "files": len(result.get("outputs", {}))
             }
             auto_checkpoint(project_dir, "team", details)
+
+        # Create session and pipeline
+        session, config_data = create_session(config, debug)
+        pipeline = TeamPipeline(session, prompt)
         
+        # Execute pipeline
+        result = asyncio.run(pipeline.execute())
+                
         # Display results
         if result["status"] == "success":
             click.echo(f"Generated {len(result.get('outputs', {}))} files using team: {', '.join(result.get('team', []))}")
@@ -273,13 +273,6 @@ def review(project_dir: Path, config: Optional[Path], debug: bool, checkpoint: b
         prompt = Prompt.from_file(prompt_file)
         logger.info("Prompt parsed successfully from %s", prompt_file)
         
-        # Create session and pipeline
-        session, config_data = create_session(config, debug)
-        pipeline = ReviewPipeline(session, prompt)
-        
-        # Execute pipeline
-        result = asyncio.run(pipeline.execute())
-        
         # Auto-checkpoint if enabled
         if checkpoint:
             details = {
@@ -287,7 +280,14 @@ def review(project_dir: Path, config: Optional[Path], debug: bool, checkpoint: b
                 "files_reviewed": len(result.get("files_reviewed", []))
             }
             auto_checkpoint(project_dir, "review", details)
+
+        # Create session and pipeline
+        session, config_data = create_session(config, debug)
+        pipeline = ReviewPipeline(session, prompt)
         
+        # Execute pipeline
+        result = asyncio.run(pipeline.execute())
+                
         # Display results
         if result["status"] == "success":
             click.echo(f"Reviewed {len(result.get('files_reviewed', []))} files using team: {', '.join(result.get('team', []))}")
