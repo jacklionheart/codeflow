@@ -38,6 +38,7 @@ def dummy_prompt(tmp_path: Path):
     )
     # Create a Prompt object and assign the _source_path (used when appending clarifications/reviews)
     prompt = Prompt(
+        root=tmp_path,
         goal="Test goal",
         output_files=[tmp_path / "test_output.py"],
         team=["mate1"]
@@ -46,9 +47,9 @@ def dummy_prompt(tmp_path: Path):
     return prompt
 
 @pytest.fixture
-def dummy_session(tmp_path: Path, dummy_team: Team):
+def dummy_session(tmp_path: Path, dummy_team: Team, mock_user):
     # Create a dummy session with a dummy user and temp directory.
-    return DummySession(user=User("test_user"), temp_dir=tmp_path, dummy_team=dummy_team)
+    return DummySession(user=mock_user, temp_dir=tmp_path, dummy_team=dummy_team)
 
 # --- ClarifyPipeline Test ---
 @pytest.mark.asyncio

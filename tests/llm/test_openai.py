@@ -15,13 +15,11 @@ def config():
 
 @pytest.fixture
 def mock_response():
-    # Mimic OpenAI ChatCompletion API response structure.
+    # Mimic the structure of a successful OpenAI ChatCompletion response.
     return {
         "choices": [
             {
-                "message": {
-                    "content": "Test OpenAI response"
-                }
+                "message": {"content": "Test OpenAI response"}
             }
         ],
         "usage": {
@@ -32,39 +30,44 @@ def mock_response():
 
 @pytest.mark.asyncio
 async def test_openai_chat_success(config, mock_response):
-    with patch("openai.resources.chat.Completions.create", new_callable=AsyncMock) as mock_acreate:
-        mock_acreate.return_value = mock_response
+    # Patch the AsyncOpenAI constructor so that our provider uses a mock client.
+    with patch("openai.AsyncOpenAI") as mock_async_openai:
+        mock_client = AsyncMock()
+        # When chat.completions.create is called, return our mock response.
+        mock_client.chat.completions.create.return_value = mock_response
+        mock_async_openai.return_value = mock_client
 
         provider = OpenAI(config)
         llm = provider.createLLM("test", "You are a test assistant.")
-
         response = await llm.chat("Hello, OpenAI!")
-
+        
         assert response == "Test OpenAI response"
-        mock_acreate.assert_called_once()
-
-        call_kwargs = mock_acreate.call_args[1]
+        mock_client.chat.completions.create.assert_called_once()
+        
+        call_kwargs = mock_client.chat.completions.create.call_args[1]
         messages = call_kwargs["messages"]
-        # Verify the last message is the current user prompt.
+        # Verify that the last message is the current user prompt.
         assert messages[-1]["content"] == "Hello, OpenAI!"
         # Verify that the configured model is used.
         assert call_kwargs["model"] == "o3-mini-high"
 
 @pytest.mark.asyncio
 async def test_openai_conversation_history(config, mock_response):
-    with patch("openai.resources.chat.Completions.create", new_callable=AsyncMock) as mock_acreate:
-        mock_acreate.return_value = mock_response
+    with patch("openai.AsyncOpenAI") as mock_async_openai:
+        mock_client = AsyncMock()
+        mock_client.chat.completions.create.return_value = mock_response
+        mock_async_openai.return_value = mock_client
 
         provider = OpenAI(config)
         llm = provider.createLLM("test", "You are a test assistant.")
-
-        # Send two messages and check that history is maintained.
+        
+        # Send two messages sequentially.
         await llm.chat("Hello, OpenAI!")
         await llm.chat("How are you?")
-
-        call_kwargs = mock_acreate.call_args[1]
+        
+        # Check that conversation history is passed into the API call.
+        call_kwargs = mock_client.chat.completions.create.call_args[1]
         messages = call_kwargs["messages"]
-        # There should be at least two user messages in the conversation history.
         user_messages = [msg for msg in messages if msg["role"] == "user"]
         assert len(user_messages) >= 2
 
@@ -89,53 +92,58 @@ async def test_openai_token_tracking(config):
             "completion_tokens": 25
         }
     }
-
-    with patch("openai.resources.chat.Completions.create", new_callable=AsyncMock) as mock_acreate:
-        mock_acreate.side_effect = [response1, response2]
+    with patch("openai.AsyncOpenAI") as mock_async_openai:
+        mock_client = AsyncMock()
+        # Simulate sequential responses.
+        mock_client.chat.completions.create.side_effect = [response1, response2]
+        mock_async_openai.return_value = mock_client
 
         provider = OpenAI(config)
         llm = provider.createLLM("test", "You are a test assistant.")
-
         await llm.chat("Message 1")
         await llm.chat("Message 2")
 
-        # Verify that usage tokens accumulate correctly.
-        assert provider.usage.input_tokens == 25  # 10 + 15
-        assert provider.usage.output_tokens == 45  # 20 + 25
+        usage = provider.usage
+        # Verify that token usage is accumulated correctly.
+        assert usage.input_tokens == 25  # 10 + 15
+        assert usage.output_tokens == 45  # 20 + 25
 
 @pytest.mark.asyncio
 async def test_openai_error_handling(config):
-    with patch("openai.resources.chat.Completions.create", new_callable=AsyncMock) as mock_acreate:
-        mock_acreate.side_effect = Exception("API Error")
+    with patch("openai.AsyncOpenAI") as mock_async_openai:
+        mock_client = AsyncMock()
+        # Simulate an API error.
+        mock_client.chat.completions.create.side_effect = Exception("API Error")
+        mock_async_openai.return_value = mock_client
 
         provider = OpenAI(config)
         llm = provider.createLLM("test", "You are a test assistant.")
-
-        with pytest.raises(LLMError) as exc:
+        with pytest.raises(LLMError) as excinfo:
             await llm.chat("Hello")
-
-        assert "API Error" in str(exc.value)
-        assert mock_acreate.call_count >= 1
+        # The error message should mention the API error.
+        assert "api error" in str(excinfo.value).lower()
+        assert mock_client.chat.completions.create.call_count >= 1
 
 @pytest.mark.asyncio
 async def test_openai_timeout(config):
     async def slow_response(*args, **kwargs):
-        await asyncio.sleep(0.2)  # simulate delay beyond the timeout
+        await asyncio.sleep(0.2)  # Delay longer than the timeout setting.
         raise asyncio.TimeoutError("Operation timed out")
-
-    with patch("openai.resources.chat.Completions.create", new_callable=AsyncMock) as mock_acreate:
-        mock_acreate.side_effect = slow_response
+    
+    with patch("openai.AsyncOpenAI") as mock_async_openai:
+        mock_client = AsyncMock()
+        mock_client.chat.completions.create.side_effect = slow_response
+        mock_async_openai.return_value = mock_client
 
         test_config = {
             "api_key": "test_openai_key",
-            "timeout": 0.1,
+            "timeout": 0.1,  # Set a short timeout.
             "max_retries": 1,
             "model": "o3-mini-high"
         }
         provider = OpenAI(test_config)
         llm = provider.createLLM("test", "You are a test assistant.")
-
-        with pytest.raises(LLMError) as exc:
+        with pytest.raises(LLMError) as excinfo:
             await llm.chat("Hello")
-
-        assert "timeout" in str(exc.value).lower()
+        # Check that the error message indicates a timeout.
+        assert "timeout" in str(excinfo.value).lower()

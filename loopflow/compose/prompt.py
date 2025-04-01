@@ -104,10 +104,10 @@ class Prompt:
             
             # Create instance
             return cls(
+                root=path.parent,
                 goal=sections['Goal'].strip(),
                 output_files=output_files,
                 team=team,
-                root=path.parent,
                 context_files=context_files
             )
         except Exception as e:
