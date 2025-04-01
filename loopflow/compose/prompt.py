@@ -29,8 +29,6 @@ class Prompt:
             raise PromptError("Goal cannot be empty")
         if not output_files:
             raise PromptError("At least one output file is required")
-        if not team:
-            team=["maya", "merlin"]
 
         self.goal = goal.strip()
         
@@ -77,8 +75,6 @@ class Prompt:
                 raise PromptError("Goal section is required")
             if sections.get('Output', '').strip() == '':
                 raise PromptError("Output section is required")
-            if sections.get('Team', '').strip() == '':
-                raise PromptError("Team section is required")
 
             # Parse sections
             output_files = [
@@ -95,12 +91,13 @@ class Prompt:
                         for f in line.split(',')
                         if f.strip()
                     )
-
-            team = [
-                line.strip()
-                for line in sections['Team'].split('\n')
-                if line.strip()
-            ]
+            team = ['maya', 'merlin']
+            if 'Team' in sections:
+                team = [
+                    line.strip()
+                    for line in sections['Team'].split('\n')
+                    if line.strip() and line.strip() != 'Team'
+                ]
             
             # Create instance
             return cls(

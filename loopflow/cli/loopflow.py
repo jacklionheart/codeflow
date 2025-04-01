@@ -99,13 +99,16 @@ def cli():
     pass
 
 @cli.command()
-@click.argument('project_dir', type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path))
+@click.argument('project_dir', required=False, default=".", type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path))
 @click.option('--config', '-c', type=click.Path(exists=True, path_type=Path),
               help='Path to config file (default: ~/.loopflow/config.yaml)')
 @click.option('--debug', '-d', is_flag=True, help='Enable debug logging')
 @click.option('--checkpoint/--no-checkpoint', default=True, help='Enable/disable auto git checkpointing')
 def clarify(project_dir: Path, config: Optional[Path], debug: bool, checkpoint: bool):
-    """Generate questions to clarify requirements."""
+    """Generate questions to clarify requirements.
+    
+    If PROJECT_DIR is omitted, the current directory (".") is used.
+    """
     try:
         setup_logging(debug)
         logger.info("Starting clarify with project directory: %s", project_dir)
@@ -127,7 +130,7 @@ def clarify(project_dir: Path, config: Optional[Path], debug: bool, checkpoint: 
             details = {
                 "questions": len(result.get("questions", {}))
             }
-            auto_checkpoint(project_dir, "clarify", config_data, details)
+            auto_checkpoint(project_dir, "clarify", details)
         
         # Display results
         if result["status"] == "success":
@@ -146,14 +149,17 @@ def clarify(project_dir: Path, config: Optional[Path], debug: bool, checkpoint: 
         raise click.Abort()
 
 @cli.command()
-@click.argument('project_dir', type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path))
+@click.argument('project_dir', required=False, default=".", type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path))
 @click.option('--config', '-c', type=click.Path(exists=True, path_type=Path),
               help='Path to config file (default: ~/.loopflow/config.yaml)')
 @click.option('--mate', '-m', help='Specific mate to use (default: first mate in prompt)')
 @click.option('--debug', '-d', is_flag=True, help='Enable debug logging')
 @click.option('--checkpoint/--no-checkpoint', default=True, help='Enable/disable auto git checkpointing')
 def mate(project_dir: Path, config: Optional[Path], mate: Optional[str], debug: bool, checkpoint: bool):
-    """Generate drafts with a specific mate."""
+    """Generate drafts with a specific mate.
+    
+    If PROJECT_DIR is omitted, the current directory (".") is used.
+    """
     try:
         setup_logging(debug)
         logger.info("Starting mate with project directory: %s", project_dir)
@@ -176,7 +182,7 @@ def mate(project_dir: Path, config: Optional[Path], mate: Optional[str], debug: 
                 "mate": result.get("mate", "unknown"),
                 "files": len(result.get("outputs", {}))
             }
-            auto_checkpoint(project_dir, "mate", config_data, details)
+            auto_checkpoint(project_dir, "mate", details)
         
         # Display results
         if result["status"] == "success":
@@ -196,13 +202,16 @@ def mate(project_dir: Path, config: Optional[Path], mate: Optional[str], debug: 
         raise click.Abort()
 
 @cli.command()
-@click.argument('project_dir', type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path))
+@click.argument('project_dir', required=False, default=".", type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path))
 @click.option('--config', '-c', type=click.Path(exists=True, path_type=Path),
               help='Path to config file (default: ~/.loopflow/config.yaml)')
 @click.option('--debug', '-d', is_flag=True, help='Enable debug logging')
 @click.option('--checkpoint/--no-checkpoint', default=True, help='Enable/disable auto git checkpointing')
 def team(project_dir: Path, config: Optional[Path], debug: bool, checkpoint: bool):
-    """Run the full team workflow (draft, review, synthesize)."""
+    """Run the full team workflow (draft, review, synthesize).
+    
+    If PROJECT_DIR is omitted, the current directory (".") is used.
+    """
     try:
         setup_logging(debug)
         logger.info("Starting team workflow with project directory: %s", project_dir)
@@ -225,7 +234,7 @@ def team(project_dir: Path, config: Optional[Path], debug: bool, checkpoint: boo
                 "team": ",".join(result.get("team", [])),
                 "files": len(result.get("outputs", {}))
             }
-            auto_checkpoint(project_dir, "team", config_data, details)
+            auto_checkpoint(project_dir, "team", details)
         
         # Display results
         if result["status"] == "success":
@@ -245,13 +254,16 @@ def team(project_dir: Path, config: Optional[Path], debug: bool, checkpoint: boo
         raise click.Abort()
 
 @cli.command()
-@click.argument('project_dir', type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path))
+@click.argument('project_dir', required=False, default=".", type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path))
 @click.option('--config', '-c', type=click.Path(exists=True, path_type=Path),
               help='Path to config file (default: ~/.loopflow/config.yaml)')
 @click.option('--debug', '-d', is_flag=True, help='Enable debug logging')
 @click.option('--checkpoint/--no-checkpoint', default=True, help='Enable/disable auto git checkpointing')
 def review(project_dir: Path, config: Optional[Path], debug: bool, checkpoint: bool):
-    """Review existing files and append feedback to the prompt."""
+    """Review existing files and append feedback to the prompt.
+    
+    If PROJECT_DIR is omitted, the current directory (".") is used.
+    """
     try:
         setup_logging(debug)
         logger.info("Starting review with project directory: %s", project_dir)
@@ -274,7 +286,7 @@ def review(project_dir: Path, config: Optional[Path], debug: bool, checkpoint: b
                 "team": ",".join(result.get("team", [])),
                 "files_reviewed": len(result.get("files_reviewed", []))
             }
-            auto_checkpoint(project_dir, "review", config_data, details)
+            auto_checkpoint(project_dir, "review", details)
         
         # Display results
         if result["status"] == "success":
@@ -293,10 +305,13 @@ def review(project_dir: Path, config: Optional[Path], debug: bool, checkpoint: b
         raise click.Abort()
 
 @cli.command()
-@click.argument('project_dir', type=click.Path(path_type=Path))
+@click.argument('project_dir', required=False, default=".", type=click.Path(path_type=Path))
 @click.option('--checkpoint/--no-checkpoint', default=True, help='Enable/disable auto git checkpointing')
 def init(project_dir: Path, checkpoint: bool):
-    """Initialize a new loopflow project directory."""
+    """Initialize a new loopflow project directory.
+    
+    If PROJECT_DIR is omitted, the current directory (".") is used.
+    """
     logger.info("Initializing new loopflow project in: %s", project_dir)
     
     project_dir.mkdir(parents=True, exist_ok=True)
@@ -333,12 +348,15 @@ merlin
     if checkpoint:
         # Load an empty config
         config_data = {}
-        auto_checkpoint(project_dir, "init", config_data, {"files": ["loopflow.md"]})
+        auto_checkpoint(project_dir, "init", {"files": ["loopflow.md"]})
 
 @cli.command()
-@click.argument('project_dir', type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path))
+@click.argument('project_dir', required=False, default=".", type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path))
 def rebase(project_dir: Path):
-    """Rebase to before loopflow checkpoints."""
+    """Rebase to before loopflow checkpoints.
+    
+    If PROJECT_DIR is omitted, the current directory (".") is used.
+    """
     try:
         logger.info("Looking for last non-loopflow commit")
         

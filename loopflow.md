@@ -1,17 +1,17 @@
 # Loopflow Communication Update
 
 ## Goal
-Let's change the main workflow of loopflow to two separate invocations. The first, "clarify", will output directly to the prompt file that was used to generate the request. 
-We will ask the llm mates to each generate questions as before, and we will simply append what was being sent as a message to the cli to the prompt file.
+Loopflow is currently a command line tool that helps you use llms to edit files (write code). Part of the system involves configuring LLMs ith system prompts to serve certain roles. Let's add a loopflow server that allows to chat with these LLMs. The overall goal should that we want to able to somehow have a chat thread with an LLM "mate" where the system prompt is used, and every time e send a reply, the discord bot forwards the chat to an LLM.
 
-The user can then update the prompt to include the questions.  THe user will then invoke a separate step ("team", will run the draft->review->synthesize flow as before. "mate" should be just a draft with a specific mate (with some default).
-This separation in workflow should be thought through carefully and handled thoroughly, from the command-line to the inner job abstractions. 
+We can assume we have a discord server with admin access. Ideally, we use standard environment variables to load API keys.
 
-We were previously planning to use Discord to handle the clarifiucation process. Instead, lets introduce a totally separate service, loopflow-server, which will be a server-side daemon that enables you to chat with a mate-configured llm on discord. This will live outside the editing workflow and the context provided to the LLM will be the same as the chat history in discord. 
-We don't need to fully implement this yet, but we should adapt any communication or User concepts to set the ground work for this inthe future.
+There may need to be some sort of init function that creates a discord bot for a given llm (for now, ID by name).
+
+Other than that, the server should mostly register for notifications with discord for this bot. When it receives chat messages (directly?), it should foraward the chat thread to the LLM and then post back the LLM's reply as a response in chat.  It is interseting to think about how this might work in channel contexts or otherise, but right now the focus shuold be identifying the most natural workflow and supporting that.
+
 
 ## Output
-loopflow/bot.py
-loopflow/session.py
-loopflow/workflow.py
-loopflow/discord.py
+loopflow/chat/server.py
+loopflow/chat/bot.py
+loopflow/io/discord.py
+loopflow/io/session.py
