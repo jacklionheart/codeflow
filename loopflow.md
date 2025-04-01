@@ -16,46 +16,6 @@ loopflow/chat/bot.py
 loopflow/io/discord.py
 loopflow/io/session.py
 
-### Questions
-
-### maya's questions
-Error: OpenAI API error: OpenAI API error: Response format invalid..
-
-### merlin's questions
-Let me explore some key questions that will help clarify the architecture and requirements of this Discord-based LLM chat system:
-
-1. Chat Context & Memory
-- How should we maintain chat history/context between messages? 
-- Should each user have their own persistent chat history with a given LLM personality?
-- Do we want to impose any limits on context length or session duration?
-- Should chat history persist across bot restarts?
-
-2. LLM Personality Management
-- How will LLM personalities (system prompts) be stored and loaded?
-- Should users be able to create/modify LLM personalities through Discord commands?
-- Do we want to support switching personalities mid-conversation?
-- Should different channels have different default personalities?
-
-3. Interaction Patterns
-- Should the bot respond to direct messages only, or also to @mentions in channels?
-- Do we want slash commands for administrative functions (like switching personalities)?
-- Should the bot maintain separate conversations in different channels?
-- How should we handle multi-user conversations - should the bot track who said what?
-
-4. Integration Architecture 
-- Where does this fit into the existing Loopflow architecture?
-- Should chat sessions be abstracted away from Discord specifics for future expansion?
-- How should we handle rate limiting for both Discord and LLM APIs?
-- What monitoring/logging do we need for debugging and analysis?
-
-5. Error Handling & Recovery
-- How should we handle LLM API failures or timeouts?
-- What happens if the Discord connection drops?
-- Should there be fallback personalities if the requested one fails?
-- How do we prevent abuse or excessive usage?
-
-Would you like to prioritize any of these areas or add additional considerations I may have missed? Understanding which aspects are most critical for your initial implementation would help focus the design.
-
 
 ## Questions
 
@@ -63,29 +23,26 @@ Would you like to prioritize any of these areas or add additional considerations
 Error: OpenAI API error: OpenAI API error: Response format invalid..
 
 ### merlin's questions
-Let me focus on what I see as the core questions that will shape how this system evolves and learns from interactions:
+Let me explore some key questions that would help clarify the architecture and requirements for this Discord-LLM chat integration:
 
-1. Conversation Boundaries & Context
-- What defines a "conversation" - is it time-based, context-based, or explicitly bounded?
-- Should each user have their own persistent memory/context with each LLM personality?
-- How do we model the difference between "remembering" previous interactions vs starting fresh?
+1. **LLM Identity & State Management**
+   - How should we handle the persistence of LLM "personalities"? 
+   - Should each LLM mate have a dedicated Discord bot identity, or should we have one bot that can channel different LLM personalities?
+   - Do we need to maintain chat history per LLM mate? If so, how long should this context window be?
 
-2. Personality Emergence & Evolution
-- How should LLM personalities be initialized and maintained?
-- Could personalities evolve based on interactions, developing their own "memory" or "learning"?
-- Should there be a way to "fork" or "merge" personalities as they develop?
+2. **Interaction Patterns**
+   - What's the primary way users should initiate conversations - DMs to the bot, mentions in channels, or both?
+   - Should the bot maintain separate conversation threads with different users, even when they're talking to the same LLM personality?
+   - How should we handle multi-user conversations - should the LLM be aware of all participants?
 
-3. Interface Metaphors & Mental Models
-- What's the core metaphor for interacting with these LLMs - are they assistants, peers, experts?
-- Should interactions be primarily 1:1 or support group dynamics?
-- How explicit should the "personality switching" mechanics be to users?
+3. **LLM Configuration**
+   - How do we want to manage the system prompts that define each LLM mate's personality?
+   - Should there be a way to modify or update an LLM mate's configuration during runtime?
+   - Do we need any rate limiting or usage tracking per LLM mate?
 
-Let me elaborate on why these matter:
+4. **Testing & Verification**
+   - What would be good metrics to track to ensure the system is working as intended?
+   - How can we verify that the LLM personalities maintain consistency across conversations?
+   - What kind of error handling and recovery do we need for both Discord and LLM API failures?
 
-The boundaries question gets at the heart of how we model agent interactions and information flow. Are we creating persistent entities that develop over time, or stateless interfaces to fixed personalities? This shapes both the technical architecture and the emergent behaviors we might observe.
-
-The personality evolution question touches on fascinating possibilities around meta-learning and emergence. Even with current LLMs being essentially stateless, we could explore ways to capture and incorporate interaction patterns into evolving personality definitions.
-
-The interface metaphor question is crucial because it shapes how users will conceptualize and therefore interact with the system. This will drive emergent usage patterns and help us understand what kinds of agent interactions are most valuable.
-
-Would you like to dig deeper into any of these areas? I'm particularly curious about your thoughts on the personality evolution aspect - do you see this as primarily a fixed-personality system or one that could develop more fluid, emergent behaviors over time?
+Let me know which of these areas you'd like to explore further or if there are other important aspects I've missed!
