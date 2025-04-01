@@ -124,10 +124,7 @@ def clarify(project_dir: Path, config: Optional[Path], debug: bool, checkpoint: 
         
         # Auto-checkpoint if enabled
         if checkpoint:
-            details = {
-                "questions": len(result.get("questions", {}))
-            }
-            auto_checkpoint(project_dir, "clarify", details)
+            auto_checkpoint(project_dir, "clarify", prompt)
 
         # Execute pipeline
         result = asyncio.run(pipeline.execute())
@@ -171,11 +168,7 @@ def mate(project_dir: Path, config: Optional[Path], mate: Optional[str], debug: 
         
         # Auto-checkpoint if enabled
         if checkpoint:
-            details = {
-                "mate": result.get("mate", "unknown"),
-                "files": len(result.get("outputs", {}))
-            }
-            auto_checkpoint(project_dir, "mate", details)
+            auto_checkpoint(project_dir, "mate", prompt)
         
         # Create session and pipeline
         session, config_data = create_session(config, debug)
@@ -223,11 +216,7 @@ def team(project_dir: Path, config: Optional[Path], debug: bool, checkpoint: boo
         
         # Auto-checkpoint if enabled
         if checkpoint:
-            details = {
-                "team": ",".join(result.get("team", [])),
-                "files": len(result.get("outputs", {}))
-            }
-            auto_checkpoint(project_dir, "team", details)
+            auto_checkpoint(project_dir, "team", prompt)
 
         # Create session and pipeline
         session, config_data = create_session(config, debug)
@@ -275,11 +264,7 @@ def review(project_dir: Path, config: Optional[Path], debug: bool, checkpoint: b
         
         # Auto-checkpoint if enabled
         if checkpoint:
-            details = {
-                "team": ",".join(result.get("team", [])),
-                "files_reviewed": len(result.get("files_reviewed", []))
-            }
-            auto_checkpoint(project_dir, "review", details)
+            auto_checkpoint(project_dir, "review", prompt)
 
         # Create session and pipeline
         session, config_data = create_session(config, debug)
@@ -333,7 +318,12 @@ src/file2.py
 maya
 merlin
 """
-    
+    # Auto-checkpoint if enabled and in a git repo
+    if checkpoint:
+        # Load an empty config
+        config_data = {}
+        auto_checkpoint(project_dir, "init", {"files": ["loopflow.md"]})
+
     prompt_path.write_text(template)
     logger.info("Created new loopflow file at: %s", prompt_path)
     click.echo(f"Created new loopflow project in {project_dir}")
@@ -344,11 +334,6 @@ merlin
     src_dir.mkdir(exist_ok=True)
     click.echo(f"Created src directory at {src_dir}")
     
-    # Auto-checkpoint if enabled and in a git repo
-    if checkpoint:
-        # Load an empty config
-        config_data = {}
-        auto_checkpoint(project_dir, "init", {"files": ["loopflow.md"]})
 
 @cli.command()
 @click.argument('project_dir', required=False, default=".", type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path))

@@ -10,7 +10,9 @@ import os
 import re
 import subprocess
 from pathlib import Path
-from typing import List, Optional, Tuple, Dict, Any
+from typing import Optional, Dict, Any
+
+from loopflow.compose.prompt import Prompt
 
 logger = logging.getLogger(__name__)
 
@@ -259,7 +261,7 @@ def should_auto_checkpoint(path: Path) -> bool:
 def auto_checkpoint(
     path: Path, 
     command: str, 
-    details: Optional[Dict[str, Any]] = None
+    prompt: Prompt
 ) -> bool:
     """
     Perform an auto-checkpoint if conditions are met.
@@ -281,6 +283,12 @@ def auto_checkpoint(
     if not stage_all_files(path):
         logger.warning("Failed to stage files for checkpoint")
         return False
-        
+
+    details = {
+        "path": path,
+        "goal": prompt.goal,
+        "output_files": prompt.output_files
+    }
+
     # Create the checkpoint
     return create_checkpoint(path, command, details)

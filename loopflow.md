@@ -87,3 +87,6 @@ loopflow/chat/bot.py
 loopflow/io/discord.py
 loopflow/io/session.py
 
+## Team
+merlin
+maya
