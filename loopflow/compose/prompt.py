@@ -5,8 +5,8 @@ Parsing user prompt markdown files
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional
-from loopflow.io.file import resolve_codebase_path
+from typing import List, Optional   
+import loopflow.io.file
 
 class PromptError(Exception):
     """Exception raised for errors in the prompt file."""
@@ -37,7 +37,7 @@ class Prompt:
         # Resolve output file paths
         try:
             self.output_files = [
-                resolve_codebase_path(p, root=root, for_reading=False) 
+                loopflow.io.file.resolve_codebase_path(p, root=root, for_reading=False) 
                 for p in output_files
             ]
         except ValueError as e:
@@ -48,7 +48,7 @@ class Prompt:
         if context_files:
             try:
                 self.context_files = [
-                    resolve_codebase_path(p, root=root, for_reading=True)
+                    loopflow.io.file.resolve_codebase_path(p, root=root, for_reading=True)
                     for p in context_files
                 ]
             except ValueError as e:

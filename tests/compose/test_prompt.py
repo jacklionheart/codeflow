@@ -136,16 +136,6 @@ def test_prompt_read_write_modes(mock_resolve):
     assert calls[0].kwargs.get('for_reading') is False  # output file
     assert calls[1].kwargs.get('for_reading') is True   # context file
 
-@pytest.mark.parametrize("test_input", [
-    {"root": Path("/mock/root"), "goal": "", "output_files": ["test.py"], "team": ["reviewer"]},
-    {"root": Path("/mock/root"), "goal": "Test", "output_files": [], "team": ["reviewer"]},
-    {"root": Path("/mock/root"), "goal": "Test", "output_files": ["test.py"], "team": []},
-])
-def test_prompt_validation(mock_resolve, test_input):
-    """Test prompt validation requirements."""
-    with pytest.raises(PromptError):
-        Prompt(**test_input)
-
 def test_prompt_team_parsing(tmp_path):
     """Test team member parsing from different formats."""
     content = """

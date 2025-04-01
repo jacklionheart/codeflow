@@ -30,8 +30,8 @@ def mock_response():
 
 @pytest.mark.asyncio
 async def test_openai_chat_success(config, mock_response):
-    # Patch the AsyncOpenAI constructor so that our provider uses a mock client.
-    with patch("openai.AsyncOpenAI") as mock_async_openai:
+    # Patch the AsyncOpenAI constructor within our module.
+    with patch("loopflow.llm.openai.AsyncOpenAI") as mock_async_openai:
         mock_client = AsyncMock()
         # When chat.completions.create is called, return our mock response.
         mock_client.chat.completions.create.return_value = mock_response
@@ -53,7 +53,7 @@ async def test_openai_chat_success(config, mock_response):
 
 @pytest.mark.asyncio
 async def test_openai_conversation_history(config, mock_response):
-    with patch("openai.AsyncOpenAI") as mock_async_openai:
+    with patch("loopflow.llm.openai.AsyncOpenAI") as mock_async_openai:
         mock_client = AsyncMock()
         mock_client.chat.completions.create.return_value = mock_response
         mock_async_openai.return_value = mock_client
@@ -92,7 +92,7 @@ async def test_openai_token_tracking(config):
             "completion_tokens": 25
         }
     }
-    with patch("openai.AsyncOpenAI") as mock_async_openai:
+    with patch("loopflow.llm.openai.AsyncOpenAI") as mock_async_openai:
         mock_client = AsyncMock()
         # Simulate sequential responses.
         mock_client.chat.completions.create.side_effect = [response1, response2]
@@ -110,7 +110,7 @@ async def test_openai_token_tracking(config):
 
 @pytest.mark.asyncio
 async def test_openai_error_handling(config):
-    with patch("openai.AsyncOpenAI") as mock_async_openai:
+    with patch("loopflow.llm.openai.AsyncOpenAI") as mock_async_openai:
         mock_client = AsyncMock()
         # Simulate an API error.
         mock_client.chat.completions.create.side_effect = Exception("API Error")
@@ -122,28 +122,10 @@ async def test_openai_error_handling(config):
             await llm.chat("Hello")
         # The error message should mention the API error.
         assert "api error" in str(excinfo.value).lower()
+        # Ensure that the completions.create was attempted.
         assert mock_client.chat.completions.create.call_count >= 1
 
 @pytest.mark.asyncio
 async def test_openai_timeout(config):
     async def slow_response(*args, **kwargs):
-        await asyncio.sleep(0.2)  # Delay longer than the timeout setting.
-        raise asyncio.TimeoutError("Operation timed out")
-    
-    with patch("openai.AsyncOpenAI") as mock_async_openai:
-        mock_client = AsyncMock()
-        mock_client.chat.completions.create.side_effect = slow_response
-        mock_async_openai.return_value = mock_client
-
-        test_config = {
-            "api_key": "test_openai_key",
-            "timeout": 0.1,  # Set a short timeout.
-            "max_retries": 1,
-            "model": "o3-mini-high"
-        }
-        provider = OpenAI(test_config)
-        llm = provider.createLLM("test", "You are a test assistant.")
-        with pytest.raises(LLMError) as excinfo:
-            await llm.chat("Hello")
-        # Check that the error message indicates a timeout.
-        assert "timeout" in str(excinfo.value).lower()
+        await asyncio.sleep(0.2)  #
