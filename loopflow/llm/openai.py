@@ -66,10 +66,12 @@ class GPT(LLM):
             # Use the model specified in the config; default to "gpt-4o"
             model = self.provider.config.get("model", "gpt-4o")
 
-            response = await self.provider.aclient.chat.completions.create(model=model,
-            messages=messages,
-            max_tokens=4096,
-            timeout=self.provider.timeout)
+            response = await self.provider.aclient.chat.completions.create(
+                model=model,
+                messages=messages,
+                max_tokens=4096,
+                timeout=self.provider.timeout
+            )
 
             # Support both attribute and dict-style access.
             try:
@@ -77,15 +79,17 @@ class GPT(LLM):
             except AttributeError:
                 choices = response["choices"]
 
+            message_response = None
+            # Try chat-completion style first.
             try:
                 message_obj = choices[0].message
-            except AttributeError:
-                message_obj = choices[0]["message"]
-
-            try:
                 message_response = message_obj["content"]
-            except (TypeError, KeyError):
-                raise LLMError("OpenAI API error: Response format invalid.")
+            except (AttributeError, KeyError, TypeError):
+                # Fallback to the older completions style using "text"
+                try:
+                    message_response = choices[0]["text"]
+                except (KeyError, TypeError):
+                    raise LLMError("OpenAI API error: Response format invalid.")
 
             input_tokens = response["usage"]["prompt_tokens"]
             output_tokens = response["usage"]["completion_tokens"]

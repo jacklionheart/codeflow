@@ -16,7 +16,7 @@ loopflow/chat/bot.py
 loopflow/io/discord.py
 loopflow/io/session.py
 
-## Questions
+### Questions
 
 ### maya's questions
 Error: OpenAI API error: OpenAI API error: Response format invalid..
@@ -55,3 +55,37 @@ Let me explore some key questions that will help clarify the architecture and re
 - How do we prevent abuse or excessive usage?
 
 Would you like to prioritize any of these areas or add additional considerations I may have missed? Understanding which aspects are most critical for your initial implementation would help focus the design.
+
+
+## Questions
+
+### maya's questions
+Error: OpenAI API error: OpenAI API error: Response format invalid..
+
+### merlin's questions
+Let me focus on what I see as the core questions that will shape how this system evolves and learns from interactions:
+
+1. Conversation Boundaries & Context
+- What defines a "conversation" - is it time-based, context-based, or explicitly bounded?
+- Should each user have their own persistent memory/context with each LLM personality?
+- How do we model the difference between "remembering" previous interactions vs starting fresh?
+
+2. Personality Emergence & Evolution
+- How should LLM personalities be initialized and maintained?
+- Could personalities evolve based on interactions, developing their own "memory" or "learning"?
+- Should there be a way to "fork" or "merge" personalities as they develop?
+
+3. Interface Metaphors & Mental Models
+- What's the core metaphor for interacting with these LLMs - are they assistants, peers, experts?
+- Should interactions be primarily 1:1 or support group dynamics?
+- How explicit should the "personality switching" mechanics be to users?
+
+Let me elaborate on why these matter:
+
+The boundaries question gets at the heart of how we model agent interactions and information flow. Are we creating persistent entities that develop over time, or stateless interfaces to fixed personalities? This shapes both the technical architecture and the emergent behaviors we might observe.
+
+The personality evolution question touches on fascinating possibilities around meta-learning and emergence. Even with current LLMs being essentially stateless, we could explore ways to capture and incorporate interaction patterns into evolving personality definitions.
+
+The interface metaphor question is crucial because it shapes how users will conceptualize and therefore interact with the system. This will drive emergent usage patterns and help us understand what kinds of agent interactions are most valuable.
+
+Would you like to dig deeper into any of these areas? I'm particularly curious about your thoughts on the personality evolution aspect - do you see this as primarily a fixed-personality system or one that could develop more fluid, emergent behaviors over time?
