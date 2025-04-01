@@ -1,6 +1,7 @@
 import pytest
 import asyncio
 from unittest.mock import AsyncMock, patch
+from types import SimpleNamespace
 from loopflow.llm.openai import OpenAI, GPT
 from loopflow.llm import LLMError
 
@@ -14,27 +15,19 @@ def config():
     }
 
 @pytest.fixture
-def mock_response():
-    # Mimic the structure of a successful OpenAI ChatCompletion response.
-    return {
-        "choices": [
-            {
-                "message": {"content": "Test OpenAI response"}
-            }
-        ],
-        "usage": {
-            "prompt_tokens": 10,
-            "completion_tokens": 20
-        }
-    }
+def fake_response_success():
+    # Create a fake response object that mimics the attribute-based API
+    return SimpleNamespace(
+        choices=[SimpleNamespace(message=SimpleNamespace(content="Test OpenAI response"))],
+        usage=SimpleNamespace(prompt_tokens=10, completion_tokens=20)
+    )
 
 @pytest.mark.asyncio
-async def test_openai_chat_success(config, mock_response):
-    # Patch the AsyncOpenAI constructor within our module.
+async def test_openai_chat_success(config, fake_response_success):
     with patch("loopflow.llm.openai.AsyncOpenAI") as mock_async_openai:
         mock_client = AsyncMock()
-        # When chat.completions.create is called, return our mock response.
-        mock_client.chat.completions.create.return_value = mock_response
+        # When chat.completions.create is called, return our fake response.
+        mock_client.chat.completions.create.return_value = fake_response_success
         mock_async_openai.return_value = mock_client
 
         provider = OpenAI(config)
@@ -52,10 +45,10 @@ async def test_openai_chat_success(config, mock_response):
         assert call_kwargs["model"] == "o3-mini-high"
 
 @pytest.mark.asyncio
-async def test_openai_conversation_history(config, mock_response):
+async def test_openai_conversation_history(config, fake_response_success):
     with patch("loopflow.llm.openai.AsyncOpenAI") as mock_async_openai:
         mock_client = AsyncMock()
-        mock_client.chat.completions.create.return_value = mock_response
+        mock_client.chat.completions.create.return_value = fake_response_success
         mock_async_openai.return_value = mock_client
 
         provider = OpenAI(config)
@@ -73,29 +66,19 @@ async def test_openai_conversation_history(config, mock_response):
 
 @pytest.mark.asyncio
 async def test_openai_token_tracking(config):
-    # Prepare two responses with different token usage.
-    response1 = {
-        "choices": [
-            {"message": {"content": "Response 1"}}
-        ],
-        "usage": {
-            "prompt_tokens": 10,
-            "completion_tokens": 20
-        }
-    }
-    response2 = {
-        "choices": [
-            {"message": {"content": "Response 2"}}
-        ],
-        "usage": {
-            "prompt_tokens": 15,
-            "completion_tokens": 25
-        }
-    }
+    # Prepare two fake responses with different token usage.
+    fake_response1 = SimpleNamespace(
+        choices=[SimpleNamespace(message=SimpleNamespace(content="Response 1"))],
+        usage=SimpleNamespace(prompt_tokens=10, completion_tokens=20)
+    )
+    fake_response2 = SimpleNamespace(
+        choices=[SimpleNamespace(message=SimpleNamespace(content="Response 2"))],
+        usage=SimpleNamespace(prompt_tokens=15, completion_tokens=25)
+    )
     with patch("loopflow.llm.openai.AsyncOpenAI") as mock_async_openai:
         mock_client = AsyncMock()
         # Simulate sequential responses.
-        mock_client.chat.completions.create.side_effect = [response1, response2]
+        mock_client.chat.completions.create.side_effect = [fake_response1, fake_response2]
         mock_async_openai.return_value = mock_client
 
         provider = OpenAI(config)
@@ -128,4 +111,23 @@ async def test_openai_error_handling(config):
 @pytest.mark.asyncio
 async def test_openai_timeout(config):
     async def slow_response(*args, **kwargs):
-        await asyncio.sleep(0.2)  #
+        await asyncio.sleep(0.2)  # Sleep longer than the timeout.
+        raise asyncio.TimeoutError("Operation timed out")
+    
+    with patch("loopflow.llm.openai.AsyncOpenAI") as mock_async_openai:
+        mock_client = AsyncMock()
+        mock_client.chat.completions.create.side_effect = slow_response
+        mock_async_openai.return_value = mock_client
+
+        # Set a very short timeout to trigger the timeout.
+        test_config = {
+            "api_key": "test_openai_key",
+            "timeout": 0.1,
+            "max_retries": 1,
+            "model": "o3-mini-high"
+        }
+        provider = OpenAI(test_config)
+        llm = provider.createLLM("test", "You are a test assistant.")
+        with pytest.raises(LLMError) as excinfo:
+            await llm.chat("Hello")
+        assert "timeout" in str(excinfo.value).lower()

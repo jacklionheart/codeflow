@@ -292,11 +292,9 @@ class Synthesize(Job):
         try:
             outputs = {}
             
-            # Pick synthesizer (prefer provided name, then maya, then first mate)
+            # Pick synthesizer (prefer provided name, then first mate)
             if synthesizer_name and synthesizer_name in team.llms:
                 pass  # Use provided name
-            elif "maya" in team.llms:
-                synthesizer_name = "maya"
             else:
                 synthesizer_name = next(iter(team.llms.keys()))
                 
