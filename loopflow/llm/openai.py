@@ -41,7 +41,7 @@ class GPT(LLM):
     """
     async def _chat(self, prompt: str) -> Tuple[str, int, int]:
         try:
-            # Build message history.
+            # Build message history: add system prompt (if any), conversation history, and current prompt.
             messages = []
             if self.system_prompt:
                 messages.append({"role": "system", "content": self.system_prompt})
@@ -50,6 +50,7 @@ class GPT(LLM):
                 messages.append({"role": "assistant", "content": interaction.response})
             messages.append({"role": "user", "content": prompt})
             logger.debug("OpenAI request messages: %s", messages)
+            
             model = self.provider.config.get("model", "gpt-4o")
             response = await self.provider.aclient.chat.completions.create(
                 model=model,
@@ -58,22 +59,24 @@ class GPT(LLM):
                 timeout=self.provider.timeout
             )
             logger.debug("OpenAI raw response: %s", response)
-            # Try to extract the reply.
+
+            # Try to extract the assistant's reply via attribute access.
             try:
                 choices = response.choices
             except AttributeError:
                 choices = response["choices"]
 
-            message_response = None
             try:
-                # Preferred format: chat completion style.
+                # Attempt to access the message object and use attribute access.
                 message_obj = choices[0].message
-                message_response = message_obj["content"]
-            except (AttributeError, KeyError, TypeError):
+                message_response = message_obj.content
+            except Exception as e_attr:
+                logger.error("Error extracting message using attribute access: %s", e_attr, exc_info=True)
+                # Fallback: try dict-style access for older API formats.
                 try:
-                    # Fallback: older completion style.
                     message_response = choices[0]["text"]
-                except (KeyError, TypeError):
+                except Exception as e_dict:
+                    logger.error("Fallback extraction using dict-style access failed: %s", e_dict, exc_info=True)
                     logger.error("OpenAI response format error, choices: %s", choices)
                     raise LLMError("OpenAI API error: Response format invalid.")
 
@@ -83,9 +86,7 @@ class GPT(LLM):
             return message_response, input_tokens, output_tokens
 
         except Exception as e:
-            logger.error(
-                "OpenAI API error. Request messages: %s; Exception: %s", messages, e, exc_info=True
-            )
+            logger.error("OpenAI API error. Request messages: %s; Exception: %s", messages, e, exc_info=True)
             error_msg = str(e).lower()
             if isinstance(e, asyncio.TimeoutError):
                 raise LLMError("OpenAI API timeout: Request timed out.")

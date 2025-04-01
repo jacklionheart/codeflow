@@ -46,3 +46,38 @@ Let me explore some key questions that would help clarify the architecture and r
    - What kind of error handling and recovery do we need for both Discord and LLM API failures?
 
 Let me know which of these areas you'd like to explore further or if there are other important aspects I've missed!
+
+
+## Questions
+
+### maya's questions
+Error: OpenAI API error: 'ChatCompletion' object is not subscriptable.
+
+### merlin's questions
+Let me explore some key questions that would help clarify the architecture and requirements for this Discord-based LLM chat system:
+
+1. LLM Session Management & Identity
+- How should we maintain the chat history/context between a user and an LLM persona?
+- Should each user get their own isolated chat history with an LLM, or should channels have shared context?
+- How do we want to handle the lifecycle of these chat sessions? (timeout, explicit end, etc.)
+- What information needs to persist between chats?
+
+2. LLM Configuration & Initialization
+- What's the minimal interface needed to "create" a new LLM chat bot?
+- Should we support hot-reloading of system prompts or does that break the mental model?
+- Do we need any special handling for different types of LLMs (Claude vs GPT etc)?
+- Should there be a way to list/discover available LLM personas?
+
+3. Discord Integration Boundaries
+- Are we focusing only on direct messages to the bot, or also channel mentions?
+- How should we handle Discord-specific features like threads, reactions, or edits?
+- Do we want any special commands (like /reset or /help) or just pure chat?
+- Should the bot's "online status" reflect anything about the underlying LLM service?
+
+The key hypothesis I see us testing here is whether having persistent, persona-based LLM chat partners (vs one-off interactions) creates more valuable/coherent interactions. We'd want to measure:
+
+- How often do users have multi-turn conversations vs single exchanges?
+- Do users develop preferences for particular LLM personas?
+- Does chat history/context actually improve the quality of responses?
+
+Does this capture the key areas we need to clarify? Let me know if you'd like to dig deeper into any of these aspects.
