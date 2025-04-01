@@ -14,9 +14,9 @@ import yaml
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, Optional, Any, List, Union, Callable
+from typing import Dict, Optional, Any, List, Callable
 
-from loopflow.llm import LLMProvider, LLM, Anthropic, OpenAI
+from loopflow.llm import LLMProvider, LLM, Anthropic, OpenAI, Team
 
 logger = logging.getLogger(__name__)
 
@@ -358,7 +358,6 @@ class Session:
                 {"requested": team_names, "available": available}
             )
         
-        from loopflow.edit.team import Team
         return Team(self.providers, llms)
     
     def get_llm(self, name: str) -> LLM:
