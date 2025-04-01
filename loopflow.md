@@ -81,3 +81,62 @@ The key hypothesis I see us testing here is whether having persistent, persona-b
 - Does chat history/context actually improve the quality of responses?
 
 Does this capture the key areas we need to clarify? Let me know if you'd like to dig deeper into any of these aspects.
+
+
+## Questions
+
+### maya's questions
+To ensure alignment and clarity on the server-focused enhancements for Loopflow, let's delve into a few critical questions:
+
+1. **Discord Bot Initialization and Identification:**
+   - What are the specific roles or functions that each LLM bot should play in the Discord server? How should these be specified in the system prompt?
+   - How do you envision mapping an LLM to a bot by name? Will there be a predefined list of LLMs, or do we need to consider dynamic mapping?
+   - What are the necessary environment variables and configuration details needed to initiate a Discord bot and link it to an LLM effectively?
+
+2. **Interaction and Notification Workflow:**
+   - Should the bot only respond to direct messages, or will it also handle messages in public or specific channels? How should it distinguish these cases?
+   - How should responses be tailored based on the type of interaction (direct message vs. channel context)? Are there specific priorities for handling high-traffic channels?
+   - What are the natural points of interaction between Discord's notification system and the LLM server? How should these be logged or tracked for user experience and error handling?
+
+3. **Conversation Thread Management:**
+   - How do we maintain the context of a conversation between a user and an LLM mate across multiple messages? What data structures or techniques should be employed to manage conversation threads effectively?
+   - Are there any security considerations in storing and processing these conversation threads, especially in relation to user data and privacy?
+
+4. **Bot Communication and API Design:**
+   - What should the API between the Discord bot and the LLM look like in terms of endpoints, methods, and data formats? How do we ensure it is minimal yet complete?
+   - How should errors be handled when communicating with LLMs (e.g., network failures, invalid inputs) to ensure a smooth user experience?
+
+5. **Performance and Scalability:**
+   - How do we ensure that the communication between the Discord bot, the chat server, and each LLM is performant, especially under high usage?
+   - What potential performance bottlenecks might arise, and how can we design the system to minimize these from the outset?
+
+By addressing these areas, we will lay a solid foundation for constructing a coherent and efficient integration between Discord and the server hosting for Loopflow.
+
+### merlin's questions
+Let me explore some key questions that will help clarify the architecture and requirements for this Discord-based LLM chat system:
+
+1. LLM Identity & State Management
+- How should we maintain the chat history/context between a user and a specific LLM persona?
+- Should each user get their own instance of an LLM persona, or should personas be shared across users?
+- Do we need to persist chat histories between sessions?
+
+2. Interaction Patterns & Scope
+- Should LLM personas be able to interact with each other in channels, or only directly with users?
+- Do we want to support group chats where multiple users interact with the same LLM instance?
+- Should LLM personas be able to access/modify files like in the CLI tool, or is this purely conversational?
+
+3. Configuration & Security
+- How should we handle rate limiting and usage tracking across different users/channels?
+- What configuration should be required vs optional when initializing a new LLM bot?
+- How do we handle authentication and permissions for who can interact with which bots?
+
+These questions touch on some fundamental architectural decisions we need to make. My hypothesis is that getting these right will determine whether the system feels natural and useful versus confusing or limiting.
+
+Would you like to discuss any of these areas in more detail? Or are there other aspects you think we should consider?
+
+The experimental value here seems to be in understanding:
+1. What interaction patterns emerge as most natural/useful
+2. How different LLM personas might complement each other
+3. How to maintain coherent persona state across interactions
+
+What are your thoughts on which of these areas we should prioritize or clarify first?

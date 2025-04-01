@@ -25,7 +25,10 @@ class OpenAI(LLMProvider):
         self.api_key = config["api_key"]
         self.timeout = config.get("timeout", 600.0)
         self.max_retries = config.get("max_retries", 3)
-        logger.info("Initializing OpenAI provider with config: %s", config)
+        logger.info("Initializing OpenAI provider with config: %s", {
+            **config, 
+            "api_key": f"{config['api_key'][:8]}...{config['api_key'][-4:]}" if config.get("api_key") else None
+        })
         self.aclient = AsyncOpenAI(api_key=config["api_key"])
 
     def createLLM(self, name: str, system_prompt: str) -> LLM:
@@ -40,6 +43,20 @@ class GPT(LLM):
     contextual chat interactions through the same model.
     """
     async def _chat(self, prompt: str) -> Tuple[str, int, int]:
+        """
+        Execute a chat interaction using OpenAI's GPT model.
+        
+        Args:
+            prompt: The user's input message
+            
+        Returns:
+            The model's response
+            Input tokens used
+            Output tokens used
+            
+        Raises:
+            LLMError: If the API call fails, with context-specific suggestions
+        """
         try:
             # Build message history: add system prompt (if any), conversation history, and current prompt.
             messages = []
@@ -49,6 +66,7 @@ class GPT(LLM):
                 messages.append({"role": "user", "content": interaction.prompt})
                 messages.append({"role": "assistant", "content": interaction.response})
             messages.append({"role": "user", "content": prompt})
+            
             logger.debug("OpenAI request messages: %s", messages)
             
             model = self.provider.config.get("model", "gpt-4o")
@@ -58,36 +76,23 @@ class GPT(LLM):
                 max_tokens=4096,
                 timeout=self.provider.timeout
             )
-            logger.debug("OpenAI raw response: %s", response)
+            
+            # Access response data using attribute access (modern OpenAI client)
+            message_content = response.choices[0].message.content
+            input_tokens = response.usage.prompt_tokens
+            output_tokens = response.usage.completion_tokens
+            
+            logger.debug("OpenAI response received: %d input tokens, %d output tokens", 
+                         input_tokens, output_tokens)
 
-            # Try to extract the assistant's reply via attribute access.
-            try:
-                choices = response.choices
-            except AttributeError:
-                choices = response["choices"]
-
-            try:
-                # Attempt to access the message object and use attribute access.
-                message_obj = choices[0].message
-                message_response = message_obj.content
-            except Exception as e_attr:
-                logger.error("Error extracting message using attribute access: %s", e_attr, exc_info=True)
-                # Fallback: try dict-style access for older API formats.
-                try:
-                    message_response = choices[0]["text"]
-                except Exception as e_dict:
-                    logger.error("Fallback extraction using dict-style access failed: %s", e_dict, exc_info=True)
-                    logger.error("OpenAI response format error, choices: %s", choices)
-                    raise LLMError("OpenAI API error: Response format invalid.")
-
-            input_tokens = response["usage"]["prompt_tokens"]
-            output_tokens = response["usage"]["completion_tokens"]
-
-            return message_response, input_tokens, output_tokens
+            return message_content, input_tokens, output_tokens
 
         except Exception as e:
-            logger.error("OpenAI API error. Request messages: %s; Exception: %s", messages, e, exc_info=True)
+            logger.error("OpenAI API error: %s", str(e), exc_info=True)
+            
             error_msg = str(e).lower()
+            
+            # Handle specific error types with helpful messages
             if isinstance(e, asyncio.TimeoutError):
                 raise LLMError("OpenAI API timeout: Request timed out.")
             elif "rate limit" in error_msg:
@@ -99,4 +104,5 @@ class GPT(LLM):
             elif "timeout" in error_msg:
                 raise LLMError("OpenAI API timeout: Request exceeded configured timeout.")
             else:
+                # Generic error handling
                 raise LLMError(f"OpenAI API error: {str(e)}.")
