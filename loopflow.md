@@ -9,9 +9,9 @@ There may need to be some sort of init function that creates a discord bot for a
 
 Other than that, the server should mostly register for notifications with discord for this bot. When it receives chat messages (directly?), it should foraward the chat thread to the LLM and then post back the LLM's reply as a response in chat.  It is interseting to think about how this might work in channel contexts or otherise, but right now the focus shuold be identifying the most natural workflow and supporting that.
 
-## Questions
+-- Questions
 
-### maya's questions
+--- maya's questions
 To ensure alignment and clarity on the server-focused enhancements for Loopflow, let's delve into a few critical questions:
 
 1. **Discord Bot Initialization and Identification:**
@@ -52,7 +52,7 @@ The discord server will:
 
 While performance and scalability are longterm important, this is really a small-scale UX prototype.
 
-### merlin's questions
+--- merlin's questions
 Let me explore some key questions that will help clarify the architecture and requirements for this Discord-based LLM chat system:
 
 1. LLM Identity & State Management
