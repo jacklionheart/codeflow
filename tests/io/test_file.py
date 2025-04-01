@@ -2,7 +2,7 @@
 
 import pytest
 from pathlib import Path
-from loopflow.file import get_code_context_root, resolve_codebase_path, get_context
+from loopflow.io.file import get_code_context_root, resolve_codebase_path, get_context
 
 def _create_files(tmp_path: Path, files: dict[str, str]) -> Path:
     """Creates files with content in the test codebase."""

@@ -5,9 +5,8 @@ Parsing user prompt markdown files
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional
-from yaml.parser import ParserError
-from loopflow.file import resolve_codebase_path
+from typing import List, Optional   
+import loopflow.io.file
 
 class PromptError(Exception):
     """Exception raised for errors in the prompt file."""
@@ -19,6 +18,7 @@ class Prompt:
     """Represents a parsed loopflow prompt file."""
     def __init__(
         self, 
+        path: Path,
         goal: str,
         output_files: List[str | Path],
         team: List[str],
@@ -29,15 +29,15 @@ class Prompt:
             raise PromptError("Goal cannot be empty")
         if not output_files:
             raise PromptError("At least one output file is required")
-        if not team:
-            raise PromptError("At least one team member is required")
 
         self.goal = goal.strip()
-        
+        self.path = path
+        self.project_dir = path.parent
+            
         # Resolve output file paths
         try:
             self.output_files = [
-                resolve_codebase_path(p, for_reading=False) 
+                loopflow.io.file.resolve_codebase_path(p, project_dir=self.project_dir, for_reading=False) 
                 for p in output_files
             ]
         except ValueError as e:
@@ -48,7 +48,7 @@ class Prompt:
         if context_files:
             try:
                 self.context_files = [
-                    resolve_codebase_path(p, for_reading=True)
+                    loopflow.io.file.resolve_codebase_path(p, project_dir=self.project_dir, for_reading=True)
                     for p in context_files
                 ]
             except ValueError as e:
@@ -77,8 +77,6 @@ class Prompt:
                 raise PromptError("Goal section is required")
             if sections.get('Output', '').strip() == '':
                 raise PromptError("Output section is required")
-            if sections.get('Team', '').strip() == '':
-                raise PromptError("Team section is required")
 
             # Parse sections
             output_files = [
@@ -95,15 +93,17 @@ class Prompt:
                         for f in line.split(',')
                         if f.strip()
                     )
-
-            team = [
-                line.strip()
-                for line in sections['Team'].split('\n')
-                if line.strip()
-            ]
+            team = ['maya', 'merlin']
+            if 'Team' in sections:
+                team = [
+                    line.strip()
+                    for line in sections['Team'].split('\n')
+                    if line.strip() and line.strip() != 'Team'
+                ]
             
             # Create instance
             return cls(
+                path=path,
                 goal=sections['Goal'].strip(),
                 output_files=output_files,
                 team=team,

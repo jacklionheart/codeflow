@@ -5,13 +5,16 @@ This module provides the concrete implementation for interacting with
 Anthropic's Claude model, with each instance maintaining its own chat context.
 """
 
-from dataclasses import dataclass
-from typing import List, Dict, Tuple
 import asyncio
+import logging
+from dataclasses import dataclass
+from typing import Any, Dict, List, Tuple
+
 import anthropic
-from typing import Any
 
 from .llm import LLMProvider, LLM, UsageStats, LLMError
+
+logger = logging.getLogger(__name__)
 
 class Anthropic(LLMProvider):
     """Provider implementation for Anthropic's API."""
@@ -20,21 +23,24 @@ class Anthropic(LLMProvider):
         """Initialize the Anthropic provider."""
         self.config = config
         self.usage = UsageStats(0, 0)
-
-        print(f"Initializing Anthropic provider with API key: {config}")
+        
+        # Mask API key in logs for security
+        logger.info("Initializing Anthropic provider with config: %s", {
+            **config, 
+            "api_key": f"{config['api_key'][:8]}...{config['api_key'][-4:]}" if config.get("api_key") else None
+        })
         
         self.client = anthropic.AsyncAnthropic(
             api_key=config["api_key"],
             timeout=config.get("timeout", 600.0),
             max_retries=config.get("max_retries", 3)
         )
-
-        print(f"Anthropic client initialized with API key: {config}")
-
+        
+        logger.debug("Anthropic client initialized successfully")
     
-    def createLLM(self, name: str, system_prompt: str, priorities: str) -> LLM:
+    def createLLM(self, name: str, system_prompt: str) -> LLM:
         """Create a new model instance."""
-        return Claude(name, self, system_prompt, priorities)
+        return Claude(name, self, system_prompt)
 
 class Claude(LLM):
     """
@@ -44,9 +50,9 @@ class Claude(LLM):
     contextual chat interactions through the same model.
     """
 
-    def __init__(self, name: str, provider: Anthropic, system_prompt: str = "", priorities: str = ""):
+    def __init__(self, name: str, provider: Anthropic, system_prompt: str = ""):
         """Initialize Claude instance."""
-        super().__init__(name, provider, system_prompt, priorities)
+        super().__init__(name, provider, system_prompt)
         self.anthropic = provider
 
     async def _chat(self, prompt: str) -> Tuple[str, int, int]:
@@ -72,19 +78,26 @@ class Claude(LLM):
                 messages.append({"role": "assistant", "content": interaction.response})
             messages.append({"role": "user", "content": prompt})
             
+            logger.debug("Claude request with %d messages", len(messages))
+            
             # Make the API request with system as a top-level parameter
+            model = self.anthropic.config.get("model", "claude-3-5-sonnet-20241022")
             response = await self.anthropic.client.messages.create(
-                model="claude-3-5-sonnet-20241022",
+                model=model,
                 system=self.system_prompt if self.system_prompt else None,
                 messages=messages,
                 max_tokens=4096
             )
+            
+            logger.debug("Claude response received: %d input tokens, %d output tokens",
+                        response.usage.input_tokens, response.usage.output_tokens)
                         
             return response.content[0].text, response.usage.input_tokens, response.usage.output_tokens
             
         except Exception as e:
+            logger.error("Claude API error: %s", str(e), exc_info=True)
+            
             error_msg = str(e).lower()
-            suggestion = ""
             
             # Handle specific error types
             if isinstance(e, asyncio.TimeoutError):

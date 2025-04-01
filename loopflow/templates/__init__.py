@@ -11,7 +11,7 @@ import importlib.resources
 from pathlib import Path
 from typing import Dict, List
 
-from loopflow.team import MateConfig
+from loopflow.llm.mate import MateConfig
 
 def load_resource(category: str, name: str) -> str:
     """

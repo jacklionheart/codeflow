@@ -9,8 +9,8 @@ from loopflow.llm import LLM, UsageStats, LLMProvider
 
 class MockLLM(LLM):
     """A mock LLM for testing."""
-    def __init__(self, name: str, provider: 'MockProvider' = None, system_prompt: str = "", priorities: str = ""):
-        super().__init__(name, provider or MockProvider(), system_prompt, priorities)
+    def __init__(self, name: str, provider: 'MockProvider' = None, system_prompt: str = ""):
+        super().__init__(name, provider or MockProvider(), system_prompt)
         self.responses: deque[str | Exception] = deque()
         self.calls: List[str] = []
     
@@ -36,9 +36,9 @@ class MockProvider(LLMProvider):
         self.usage = UsageStats(0, 0)
         self.llms: Dict[str, MockLLM] = {}
         
-    def createLLM(self, name: str, system_prompt: str = None, priorities: str = None) -> MockLLM:
+    def createLLM(self, name: str, system_prompt: str = None) -> MockLLM:
         """Create a new mock LLM."""
-        llm = MockLLM(name, self, system_prompt, priorities)
+        llm = MockLLM(name, self, system_prompt)
         self.llms[name] = llm
         return llm
 

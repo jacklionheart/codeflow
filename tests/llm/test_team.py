@@ -3,7 +3,7 @@ from pathlib import Path
 from unittest.mock import AsyncMock, patch
 from typing import Dict, Any
 
-from loopflow.team import Team, MateConfig, MateError
+from loopflow.llm.mate import MateConfig, MateError, Team
 from loopflow.llm import LLM
 from tests.mock import MockProvider
 
@@ -25,7 +25,7 @@ def mock_llms(mock_llm_factory):
 @pytest.fixture
 def team(mock_llms):
     """Create a Team instance with mock LLMs."""
-    return Team(MockProvider(), mock_llms)
+    return Team({"mock": MockProvider()}, mock_llms)
 
 @pytest.fixture
 def mate_file_content():
@@ -36,9 +36,9 @@ A test reviewer role.
 ## System Prompt
 You are a test reviewer.
 
-## Priorities
-Things that you care about
-Like cats"""
+## Provider
+mock
+"""
 
 @pytest.mark.asyncio
 async def test_team_query_parallel_success(team, mock_llms):
@@ -85,7 +85,7 @@ def test_mate_from_file_success(tmp_path, mate_file_content):
     mate = MateConfig.from_file(mate_file)
     
     assert mate.name == "test_mate"
-    assert mate.priorities == "Things that you care about\nLike cats"
+    assert mate.provider == "mock"
     assert mate.system_prompt == "You are a test reviewer."
 
 def test_mate_from_file_missing_section(tmp_path):
@@ -93,8 +93,8 @@ def test_mate_from_file_missing_section(tmp_path):
     incomplete_content = """## Description
 A test reviewer role.
 
-## Priorities
-- testing
+## Provider
+mock
 """
     mate_file = tmp_path / "incomplete_mate.md"
     mate_file.write_text(incomplete_content)

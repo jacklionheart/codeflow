@@ -12,7 +12,7 @@ from fnmatch import fnmatch
 from dataclasses import dataclass
 import logging 
 
-logger = logging.getLogger("loopflow.file")
+logger = logging.getLogger(__name__)
 
 @dataclass
 class Document:
@@ -29,28 +29,36 @@ def get_code_context_root() -> Path:
 def resolve_codebase_path(
     path_str: Union[str, Path], 
     root: Optional[Path] = None,
+    project_dir: Optional[Path] = None,
     for_reading: bool = True
 ) -> Path:
     """
-    Convert path string to an absolute path following codebase conventions:
-    1. Try direct path first
-    2. Try doubled path (project/project/rest) if direct doesn't exist
-    3. Return direct path if neither exists
-    
-    All returned paths are guaranteed to be absolute.
+    Convert path string to an absolute path following codebase conventions.
     
     Args:
         path_str: Path to resolve
-        root: Root directory (defaults to get_code_context_root())
+        root: Root directory for global paths (defaults to get_code_context_root())
+        project_dir: Project directory for relative paths (overrides root)
         for_reading: Whether path is for reading (vs writing)
+    
+    Returns:
+        Resolved absolute path
     """
     if root is None:
         root = get_code_context_root()
 
     path_obj = Path(str(path_str))
+    
+    # If path is absolute, just return it
     if path_obj.is_absolute():
         return path_obj.resolve()
-
+    
+    # If project_dir is specified, use that as the base for relative paths
+    if project_dir is not None:
+        result = (project_dir / path_obj).resolve()
+        return result
+    
+    # Otherwise use the traditional code context resolution
     dirpath = path_obj.parent
     filename = path_obj.name
     direct_path = (root / path_obj).resolve()
@@ -75,12 +83,22 @@ def resolve_codebase_path(
             result = direct_path
         return result
 
-def _find_parent_readmes(path: Path) -> List[Path]:
-    """Find all README.md files from given path up to CODE_CONTEXT_ROOT."""
+def _find_parent_readmes(path: Path, context_root: Optional[Path] = None) -> List[Path]:
+    """
+    Find all README.md files from given path up to context root.
+    
+    Args:
+        path: Path to start from
+        context_root: Root directory to stop at (defaults to CODE_CONTEXT_ROOT)
+    
+    Returns:
+        List of README paths
+    """
     readmes = []
     current = path
-    root = get_code_context_root()
+    root = context_root or get_code_context_root()
 
+    # Go up the directory tree until we reach the root or can't go higher
     while current != root and current != current.parent:
         readme_path = current / "README.md"
         if readme_path.exists():
@@ -227,10 +245,11 @@ def _format_document(doc: Document, raw: bool) -> str:
     return "\n".join(lines)
 
 def get_context(
-    paths: Optional[List[str]],
+    paths: Optional[List[Union[str, Path]]],
     raw: bool = False,
     extensions: Optional[Tuple[str, ...]] = None,
-    root: Optional[Path] = None
+    root: Optional[Path] = None,
+    project_dir: Optional[Path] = None
 ) -> str:
     """
     Load and format context from specified paths.
@@ -240,6 +259,10 @@ def get_context(
         raw: Whether to use raw format instead of XML
         extensions: Optional tuple of file extensions to filter
         root: Optional root directory (defaults to CODE_CONTEXT_ROOT)
+        project_dir: Optional project directory (overrides root)
+    
+    Returns:
+        Formatted context string
     """
     if root is None:
         root = get_code_context_root()
@@ -254,13 +277,20 @@ def get_context(
 
     for path_str in paths:
         try:
-            path = resolve_codebase_path(path_str, root, for_reading=True)
+            # Use project_dir if provided, otherwise use root
+            path = resolve_codebase_path(
+                path_str, 
+                root=root, 
+                project_dir=project_dir,
+                for_reading=True
+            )
+            
             if not path.exists():
                 logger.warning(f"Path does not exist: {path}")
                 continue
 
             # Process parent READMEs first
-            for readme_path in _find_parent_readmes(path):
+            for readme_path in _find_parent_readmes(path, context_root=project_dir):
                 if doc := _load_file(str(readme_path), next_index, processed_files, extensions):
                     documents.append(doc)
                     processed_files.add(str(readme_path))
