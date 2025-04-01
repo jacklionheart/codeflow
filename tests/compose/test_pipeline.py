@@ -29,7 +29,7 @@ def dummy_team():
 @pytest.fixture
 def dummy_prompt(tmp_path: Path):
     # Create a temporary prompt file to act as the source.
-    prompt_file = tmp_path / "prompt.md"
+    prompt_file = tmp_path / "loopflow.md"
     prompt_file.write_text(
         "# Test Prompt\n\n"
         "## Goal\nTest goal\n\n"
@@ -38,12 +38,11 @@ def dummy_prompt(tmp_path: Path):
     )
     # Create a Prompt object and assign the _source_path (used when appending clarifications/reviews)
     prompt = Prompt(
-        root=tmp_path,
+        path=prompt_file,
         goal="Test goal",
         output_files=[tmp_path / "test_output.py"],
         team=["mate1"]
     )
-    prompt._source_path = prompt_file
     return prompt
 
 @pytest.fixture
@@ -65,7 +64,7 @@ async def test_clarify_pipeline(dummy_session, dummy_prompt):
         assert result["status"] == "success", result
         assert "questions" in result
         # Verify that clarifications have been appended to the prompt file.
-        content = dummy_prompt._source_path.read_text()
+        content = dummy_prompt.path.read_text()
         assert "### mate1's questions" in content
         assert "What is the requirement?" in content
     finally:
@@ -110,7 +109,7 @@ async def test_review_pipeline(dummy_session, dummy_prompt):
         result = await pipeline.execute()
         assert result["status"] == "success"
         # Verify that the prompt file now has appended review content.
-        content = dummy_prompt._source_path.read_text()
+        content = dummy_prompt.path.read_text()
         assert "### mate1's review" in content
         assert "dummy review content" in content
     finally:

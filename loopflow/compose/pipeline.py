@@ -195,15 +195,10 @@ class ClarifyPipeline(Pipeline):
         Returns:
             True if the prompt file was updated successfully
         """
-        # Get the prompt file path
-        prompt_file_path = getattr(self.prompt, '_source_path', None)
-        if not prompt_file_path:
-            self.logger.warning("No source path for prompt, can't append clarifications")
-            return False
         
         try:
-            self.logger.info(f"Appending clarifications to {prompt_file_path}")
-            with open(prompt_file_path, 'a') as f:
+            self.logger.info(f"Appending clarifications to {self.prompt.path}")
+            with open(self.prompt.path, 'a') as f:
                 f.write("\n\n## Questions\n")
                 
                 # Write each team member's questions as a separate section
@@ -376,14 +371,10 @@ class ReviewPipeline(Pipeline):
         Returns:
             True if prompt file was updated successfully
         """
-        prompt_file_path = getattr(self.prompt, '_source_path', None)
-        if not prompt_file_path:
-            self.logger.warning("No source path for prompt, can't append reviews")
-            return False
         
         try:
-            self.logger.info(f"Appending reviews to {prompt_file_path}")
-            with open(prompt_file_path, 'a') as f:
+            self.logger.info(f"Appending reviews to {self.prompt.path}")
+            with open(self.prompt.path, 'a') as f:
                 f.write("\n\n## Reviews\n")
                 
                 # Write each reviewer's reviews

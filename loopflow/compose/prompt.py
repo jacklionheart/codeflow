@@ -18,7 +18,7 @@ class Prompt:
     """Represents a parsed loopflow prompt file."""
     def __init__(
         self, 
-        root: Path,
+        path: Path,
         goal: str,
         output_files: List[str | Path],
         team: List[str],
@@ -31,11 +31,13 @@ class Prompt:
             raise PromptError("At least one output file is required")
 
         self.goal = goal.strip()
-        
+        self.path = path
+        self.project_dir = path.parent
+            
         # Resolve output file paths
         try:
             self.output_files = [
-                loopflow.io.file.resolve_codebase_path(p, root=root, for_reading=False) 
+                loopflow.io.file.resolve_codebase_path(p, project_dir=self.project_dir, for_reading=False) 
                 for p in output_files
             ]
         except ValueError as e:
@@ -46,7 +48,7 @@ class Prompt:
         if context_files:
             try:
                 self.context_files = [
-                    loopflow.io.file.resolve_codebase_path(p, root=root, for_reading=True)
+                    loopflow.io.file.resolve_codebase_path(p, project_dir=self.project_dir, for_reading=True)
                     for p in context_files
                 ]
             except ValueError as e:
@@ -101,7 +103,7 @@ class Prompt:
             
             # Create instance
             return cls(
-                root=path.parent,
+                path=path,
                 goal=sections['Goal'].strip(),
                 output_files=output_files,
                 team=team,

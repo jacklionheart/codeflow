@@ -15,3 +15,43 @@ loopflow/chat/server.py
 loopflow/chat/bot.py
 loopflow/io/discord.py
 loopflow/io/session.py
+
+## Questions
+
+### maya's questions
+Error: OpenAI API error: OpenAI API error: Response format invalid..
+
+### merlin's questions
+Let me explore some key questions that will help clarify the architecture and requirements of this Discord-based LLM chat system:
+
+1. Chat Context & Memory
+- How should we maintain chat history/context between messages? 
+- Should each user have their own persistent chat history with a given LLM personality?
+- Do we want to impose any limits on context length or session duration?
+- Should chat history persist across bot restarts?
+
+2. LLM Personality Management
+- How will LLM personalities (system prompts) be stored and loaded?
+- Should users be able to create/modify LLM personalities through Discord commands?
+- Do we want to support switching personalities mid-conversation?
+- Should different channels have different default personalities?
+
+3. Interaction Patterns
+- Should the bot respond to direct messages only, or also to @mentions in channels?
+- Do we want slash commands for administrative functions (like switching personalities)?
+- Should the bot maintain separate conversations in different channels?
+- How should we handle multi-user conversations - should the bot track who said what?
+
+4. Integration Architecture 
+- Where does this fit into the existing Loopflow architecture?
+- Should chat sessions be abstracted away from Discord specifics for future expansion?
+- How should we handle rate limiting for both Discord and LLM APIs?
+- What monitoring/logging do we need for debugging and analysis?
+
+5. Error Handling & Recovery
+- How should we handle LLM API failures or timeouts?
+- What happens if the Discord connection drops?
+- Should there be fallback personalities if the requested one fails?
+- How do we prevent abuse or excessive usage?
+
+Would you like to prioritize any of these areas or add additional considerations I may have missed? Understanding which aspects are most critical for your initial implementation would help focus the design.
