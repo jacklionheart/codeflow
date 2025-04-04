@@ -2,9 +2,6 @@
 
 **loopflow** is a workflow system for a graphs of structured llm requests for codegen.
 
-## License
-MIT
-
 ## How it works
 
 loopflow has two primary interfaces:
@@ -46,7 +43,31 @@ The following two are the defaults currently available:
 
 You can add mates in `templates/mates`; simply creating the file is sufficient for it be available.
 
-### `code-context`: Smart Context Management
+### Prompt Files
+
+You can create a prompt file template with `loopflow init`. 
+
+They should look like this:
+```markdown
+# Loopflow LLM Implementation
+
+## Goal
+Implement the LLM API for loopflow, a tool for generating code with teams of LLMs.
+
+## Output
+loopflow/llm/llm.py
+loopflow/llm/anthropic.py
+loopflow/tests/test_llm.py
+
+## Context
+loopflow/
+
+## Team
+maya
+merlin
+```
+
+## `code-context`: For providing code context to LLMs Web UI
 
 Key to loopflow is submitting the right context, i.e. subset of the codebase as a reference. This is
 a part of how loopflow works, but installing loopflow also installs a `code-context` binary that is
@@ -86,26 +107,5 @@ Contact jack@loopflow.studio with any questions. Kinks likely not ironed out.
 
 You must set `ANTHROPIC_API_KEY` and/or `OPENAI_API_KEY` in your environment to use those providers.
 
-## Prompt Files
-
-You can create a prompt file template with `loopflow init`. 
-
-They should look like this:
-```markdown
-# Loopflow LLM Implementation
-
-## Goal
-Implement the LLM API for loopflow, a tool for generating code with teams of LLMs.
-
-## Output
-loopflow/llm/llm.py
-loopflow/llm/anthropic.py
-loopflow/tests/test_llm.py
-
-## Context
-loopflow/
-
-## Team
-maya
-merlin
-```
+## License
+MIT
