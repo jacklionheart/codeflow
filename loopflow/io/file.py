@@ -186,7 +186,7 @@ def _is_binary_path(path: Path) -> bool:
 
 def _is_data_path(path: Path) -> bool:
     """Check if a file path likely contains data content rather than source code."""
-    data_extensions = {'.log'}
+    data_extensions = {'.log', '.txt'}
     return any(path.name.endswith(ext) for ext in data_extensions)
 
 
