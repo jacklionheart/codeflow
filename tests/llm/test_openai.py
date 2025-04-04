@@ -56,7 +56,7 @@ async def test_openai_conversation_history(config, fake_response_success):
         
         # Send two messages sequentially.
         await llm.chat("Hello, OpenAI!")
-        await llm.chat("How are you?")
+        await llm.chat("How are you?", include_history=True)
         
         # Check that conversation history is passed into the API call.
         call_kwargs = mock_client.chat.completions.create.call_args[1]
@@ -84,7 +84,7 @@ async def test_openai_token_tracking(config):
         provider = OpenAI(config)
         llm = provider.createLLM("test", "You are a test assistant.")
         await llm.chat("Message 1")
-        await llm.chat("Message 2")
+        await llm.chat("Message 2", include_history=True)
 
         usage = provider.usage
         # Verify that token usage is accumulated correctly.

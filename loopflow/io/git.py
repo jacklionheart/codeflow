@@ -14,7 +14,6 @@ from typing import Optional, Dict, Any
 
 from loopflow.compose.prompt import Prompt
 
-logger = logging.getLogger(__name__)
 
 class GitError(Exception):
     """Exception raised for git-related errors."""
@@ -33,6 +32,7 @@ def is_git_repo(path: Path) -> bool:
         True if path is inside a git repository, False otherwise
     """
     try:
+        logger = logging.getLogger(__name__)
         result = subprocess.run(
             ["git", "rev-parse", "--is-inside-work-tree"],
             cwd=path,
@@ -56,6 +56,7 @@ def get_current_branch(path: Path) -> Optional[str]:
         Current branch name or None if not in a repo or on a detached HEAD
     """
     try:
+        logger = logging.getLogger(__name__)
         result = subprocess.run(
             ["git", "rev-parse", "--abbrev-ref", "HEAD"],
             cwd=path,
@@ -83,6 +84,7 @@ def stage_all_files(path: Path) -> bool:
         True if successful, False otherwise
     """
     try:
+        logger = logging.getLogger(__name__)
         subprocess.run(
             ["git", "add", "."],
             cwd=path,
@@ -114,6 +116,7 @@ def create_checkpoint(
         True if successful, False otherwise
     """
     try:
+        logger = logging.getLogger(__name__)
         # Construct commit message
         commit_message = f"{LOOPFLOW_CHECKPOINT_PREFIX} {command}"
         if details:
@@ -152,6 +155,7 @@ def find_last_non_loopflow_commit(path: Path) -> Optional[str]:
         Commit hash of the last non-loopflow commit, or None if not found
     """
     try:
+        logger = logging.getLogger(__name__)
         # Get commit history with messages
         result = subprocess.run(
             ["git", "log", "--pretty=format:%H|%s"],
@@ -191,6 +195,7 @@ def rebase_to_commit(path: Path, commit_hash: str) -> bool:
         True if successful, False otherwise
     """
     try:
+        logger = logging.getLogger(__name__)
         # First stash any uncommitted changes
         subprocess.run(
             ["git", "stash"],
@@ -263,6 +268,7 @@ def auto_checkpoint(
     command: str, 
     prompt: Prompt
 ) -> bool:
+    logger = logging.getLogger(__name__)
     """
     Perform an auto-checkpoint if conditions are met.
     

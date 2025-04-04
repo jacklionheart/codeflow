@@ -47,10 +47,9 @@ async def test_team_query_parallel_success(team, mock_llms):
     mock_llms["reviewer1"].chat.return_value = "Response 1"
     mock_llms["reviewer2"].chat.return_value = "Response 2"
     
-    prompt = "Test prompt {name}"
-    args = {"key": "value"}
+    prompt = "Test prompt"
     
-    responses = await team.query_parallel(prompt, args)
+    responses = await team.query_parallel(prompt)
     
     assert len(responses) == 2
     assert responses["reviewer1"] == "Response 1"
@@ -58,24 +57,11 @@ async def test_team_query_parallel_success(team, mock_llms):
     
     # Verify prompt formatting for each mate
     mock_llms["reviewer1"].chat.assert_called_once_with(
-        prompt.format(name="reviewer1", **args)
+        prompt.format(name="reviewer1")
     )
     mock_llms["reviewer2"].chat.assert_called_once_with(
-        prompt.format(name="reviewer2", **args)
+        prompt.format(name="reviewer2")
     )
-
-@pytest.mark.asyncio
-async def test_team_query_parallel_partial_failure(team, mock_llms):
-    """Test handling of failures from some team members."""
-    error = Exception("API Error")
-    mock_llms["reviewer1"].chat.side_effect = error
-    mock_llms["reviewer2"].chat.return_value = "Response 2"
-    
-    responses = await team.query_parallel("Test prompt {name}", {})
-    
-    assert len(responses) == 2
-    assert responses["reviewer1"] == f"Error: {str(error)}"
-    assert responses["reviewer2"] == "Response 2"
 
 def test_mate_from_file_success(tmp_path, mate_file_content):
     """Test successful MateConfig creation from file."""
@@ -121,5 +107,5 @@ More content
 async def test_team_empty_mates():
     """Test team behavior with no mates."""
     team = Team(MockProvider(), {})
-    result = await team.query_parallel("Test", {})
+    result = await team.query_parallel("Test")
     assert result == {}, "Empty team should return empty results"

@@ -92,7 +92,7 @@ class LLM(ABC):
         self.provider = provider
         self.history: List[Interaction] = []
         self.system_prompt = system_prompt
-    async def chat(self, prompt: str) -> str:
+    async def chat(self, prompt: str, include_history: bool = False) -> str:
         """
         Send a message and get a response, maintaining conversation context.
         
@@ -105,8 +105,16 @@ class LLM(ABC):
         Raises:
             LLMError: If the chat interaction fails
         """
+
+        messages = []
+        if include_history:
+            for interaction in self.history:
+                messages.append({"role": "user", "content": interaction.prompt})
+                messages.append({"role": "assistant", "content": interaction.response})
+        messages.append({"role": "user", "content": prompt})
+            
         interaction = Interaction(prompt=prompt, response="")
-        response, input_tokens, output_tokens = await self._chat(prompt)
+        response, input_tokens, output_tokens = await self._chat(messages)
         interaction.response = response
 
         self.provider.track(input_tokens, output_tokens)

@@ -7,7 +7,7 @@ OpenAI's Chat API, with each instance maintaining its own conversation history.
 
 import asyncio
 import logging
-from typing import Any, Dict, Tuple
+from typing import Any, Dict, Tuple, List
 
 from openai import AsyncOpenAI
 
@@ -42,7 +42,7 @@ class GPT(LLM):
     Each instance maintains its own conversation history, allowing for
     contextual chat interactions through the same model.
     """
-    async def _chat(self, prompt: str) -> Tuple[str, int, int]:
+    async def _chat(self, messages: List[Dict[str, str]]) -> Tuple[str, int, int]:
         """
         Execute a chat interaction using OpenAI's GPT model.
         
@@ -57,16 +57,7 @@ class GPT(LLM):
         Raises:
             LLMError: If the API call fails, with context-specific suggestions
         """
-        try:
-            # Build message history: add system prompt (if any), conversation history, and current prompt.
-            messages = []
-            if self.system_prompt:
-                messages.append({"role": "system", "content": self.system_prompt})
-            for interaction in self.history:
-                messages.append({"role": "user", "content": interaction.prompt})
-                messages.append({"role": "assistant", "content": interaction.response})
-            messages.append({"role": "user", "content": prompt})
-            
+        try:           
             logger.debug("OpenAI request messages: %s", messages)
             
             model = self.provider.config.get("model", "gpt-4o")

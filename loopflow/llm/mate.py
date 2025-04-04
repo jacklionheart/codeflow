@@ -98,12 +98,11 @@ class Team:
         self.llms = llms
 
     
-    async def query_parallel(self, prompt_template: str, args: Dict[str, Any]) -> Dict[str, str]:
+    async def query_parallel(self, prompt: str) -> Dict[str, str]:
         tasks = []
         mate_names = []
         
         for name, llm in self.llms.items():
-            prompt = prompt_template.format(name=name, **args)
             # Create the coroutine but don't await it yet
             tasks.append(asyncio.create_task(llm.chat(prompt)))
             mate_names.append(name)

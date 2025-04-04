@@ -5,8 +5,6 @@ import asyncio
 from loopflow.llm import LLMError
 from loopflow.llm.anthropic import Anthropic
 
-@pytest.fixture
-
 @pytest.mark.asyncio
 async def test_anthropic_chat(config, mock_response):
     """Test basic chat functionality with Anthropic."""
@@ -40,7 +38,7 @@ async def test_anthropic_conversation_history(config, mock_response):
         # First message
         await llm.chat("Hello")
         # Second message
-        await llm.chat("How are you?")
+        await llm.chat("How are you?", include_history=True)
         
         call_kwargs = mock_client.messages.create.call_args[1]
         messages = call_kwargs['messages']

@@ -89,12 +89,11 @@ class Clarify(Job):
         try:
             # Gather questions from all models
             questions = await team.query_parallel(
-                QUESTION_TEMPLATE,
-                {
-                    "goal": self.prompt.goal,
-                    "file_paths": "\n".join(str(p) for p in self.prompt.output_files),
-                    "context": get_context(self.prompt.context_files),
-                }
+                QUESTION_TEMPLATE.format(
+                    goal=self.prompt.goal,
+                    file_paths=("\n".join(str(p) for p in self.prompt.output_files)),
+                    context=get_context(self.prompt.context_files),
+                )
             )
             
             self.logger.info("Received questions from team members:")
@@ -156,11 +155,12 @@ class Draft(Job):
                 self.logger.info(f"Generating drafts for {file_path}")
                 
                 draft_prompt = DRAFT_TEMPLATE.format(
+                    file_path=str(file_path),
                     goal=self.prompt.goal,
-                    file_path=str(file_path)
+                    context=get_context(self.prompt.context_files),
                 )
                 
-                responses = await team.query_parallel(draft_prompt, {})
+                responses = await team.query_parallel(draft_prompt)
                 self.logger.info(f"Received {len(responses)} drafts for {file_path}")
                 
                 for author, content in responses.items():
@@ -226,11 +226,12 @@ class Review(Job):
                 
                 # Get reviews
                 responses = await team.query_parallel(
-                    REVIEW_TEMPLATE,
-                    {
-                        "file_paths": file_paths_str,
-                        "draft": all_drafts_str,
-                    }
+                    REVIEW_TEMPLATE.format(
+                        file_paths=file_paths_str,
+                        goal=self.prompt.goal,
+                        draft=all_drafts_str,
+                        context=get_context(self.prompt.context_files),
+                    )
                 )
                 
                 self.logger.info(f"Received {len(responses)} reviews for {author}'s drafts")
@@ -336,7 +337,9 @@ class Synthesize(Job):
                 
                 synthesis_prompt = SYNTHESIS_TEMPLATE.format(
                     file_path=str(file_path),
-                    drafts_and_reviews=full_context
+                    drafts_and_reviews=full_context,
+                    goal=self.prompt.goal,
+                    context=get_context(self.prompt.context_files),
                 )
                 
                 final_content = await synthesizer.chat(synthesis_prompt)

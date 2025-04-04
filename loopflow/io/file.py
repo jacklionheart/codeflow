@@ -8,7 +8,7 @@ with special handling for READMEs and support for both XML and raw output format
 import os
 from pathlib import Path
 from typing import List, Set, Optional, Tuple, Union
-from fnmatch import fnmatch
+import fnmatch
 from dataclasses import dataclass
 import logging 
 
@@ -53,6 +53,11 @@ def resolve_codebase_path(
     if path_obj.is_absolute():
         return path_obj.resolve()
     
+    # Handle dot paths by resolving them against current working directory first
+    if str(path_obj) == "." or str(path_obj) == ".." or "./" in str(path_obj) or "../" in str(path_obj):
+        path_obj = Path.cwd() / path_obj
+        return path_obj.resolve()
+
     # If project_dir is specified, use that as the base for relative paths
     if project_dir is not None:
         result = (project_dir / path_obj).resolve()
@@ -91,6 +96,7 @@ def _find_parent_readmes(path: Path, context_root: Optional[Path] = None) -> Lis
         path: Path to start from
         context_root: Root directory to stop at (defaults to CODE_CONTEXT_ROOT)
     
+        
     Returns:
         List of README paths
     """
@@ -114,61 +120,112 @@ def _find_parent_readmes(path: Path, context_root: Optional[Path] = None) -> Lis
     readmes.sort(key=lambda p: (len(p.parts), str(p)))
     return readmes
 
-def _should_ignore(path: str, gitignore_rules: List[str], root_dir: str) -> bool:
-    """Check if path should be ignored according to gitignore patterns."""
-    rel_path = os.path.relpath(path, root_dir)
-    basename = os.path.basename(path)
+def _should_ignore(
+    path: Path,
+    gitignore_rules: List[str],
+    root_dir: Path,
+    extensions: Optional[Tuple[str, ...]] = None
+) -> bool:
+    rel_path = os.path.relpath(str(path), root_dir)
+    basename = path.name
+
+    # Always skip binary or data files
+    if _is_binary_path(path) or _is_data_path(path):
+        return True
+
+    # Always include README.md
+    if basename == "README.md":
+        return False
+
+    # If filtering by extension for files, and this file doesn’t match, ignore it.
+    if extensions and path.is_file() and not any(path.name.endswith(ext) for ext in extensions):
+        return True
 
     for rule in gitignore_rules:
-        if fnmatch(basename, rule) or fnmatch(rel_path, rule):
-            return True
-        if os.path.isdir(path) and (fnmatch(basename + "/", rule) or fnmatch(rel_path + "/", rule)):
-            return True
+        rule = rule.strip()
+        if not rule or rule.startswith("#"):
+            continue
+
+        # If the rule contains a slash, treat it as relative to the project_dir.
+        if "/" in rule:
+            # For rules starting with a slash, strip it and check if rel_path starts with the pattern.
+            if rule.startswith("/"):
+                pattern = rule.lstrip("/")
+                # If rule ends with a slash, match directory prefixes.
+                if rule.endswith("/"):
+                    if rel_path.startswith(pattern):
+                        return True
+                else:
+                    # Use fnmatch to allow wildcards.
+                    if fnmatch.fnmatch(rel_path, pattern):
+                        return True
+            else:
+                # Rule with a slash but not anchored; apply fnmatch against the entire relative path.
+                if fnmatch.fnmatch(rel_path, rule):
+                    return True
+        else:
+            # For rules without a slash:
+            # If the rule appears as a glob pattern, match against basename and anywhere in rel_path.
+            if any(ch in rule for ch in "*?[]"):
+                if fnmatch.fnmatch(basename, rule) or fnmatch.fnmatch(rel_path, f"*{rule}*"):
+                    return True
+            else:
+                # Plain string: if the rule appears anywhere in basename or rel_path, ignore.
+                if rule in basename or rule in rel_path:
+                    return True
     return False
 
-def _is_binary_path(path: str) -> bool:
+def _is_binary_path(path: Path) -> bool:
     """Check if a file path likely contains binary content."""
     binary_extensions = {
         '.pyc', '.pyo', '.pyd', '.so', '.dll', '.dylib',
-        '.exe', '.bin', '.pkl', '.pickle',
+        '.exe', '.bin', '.pkl', '.pickle', '.wandb',
         '.zip', '.tar', '.gz', '.jpg', '.png', '.gif'
     }
-    return any(path.endswith(ext) for ext in binary_extensions)
+    return any(path.name.endswith(ext) for ext in binary_extensions)
+
+def _is_data_path(path: Path) -> bool:
+    """Check if a file path likely contains data content rather than source code."""
+    data_extensions = {'.log'}
+    return any(path.name.endswith(ext) for ext in data_extensions)
+
 
 def _load_file(
-    path: str,
+    path: Path,
     index: int,
-    processed_files: Set[str],
-    extensions: Optional[Tuple[str, ...]] = None
+    processed_files: Set[Path],
 ) -> Optional[Document]:
     """Load a single file into a Document if it meets criteria."""
     if path in processed_files:
-        return None
-    if extensions and not (path.endswith("README.md") or any(path.endswith(ext) for ext in extensions)):
-        return None
-    if _is_binary_path(path):
-        print(f"Warning: Skipping binary file {path}")
         return None
 
     try:
         with open(path, "r", encoding='utf-8') as f:
             return Document(
                 index=index,
-                source=path,
+                source=str(path),
                 content=f.read(),
-                is_readme=path.endswith("README.md")
+                is_readme=path.name.endswith("README.md")
             )
     except UnicodeDecodeError:
-        print(f"Warning: Skipping file {path} due to UnicodeDecodeError")
+        logger.warning(f"Skipping file {path} due to UnicodeDecodeError")
         return None
     except Exception as e:
-        print(f"Error reading {path}: {e}")
+        logger.error(f"Error reading {path}: {e}")
         return None
 
+def _matches_extensions(path: Path, extensions: Optional[Tuple[str, ...]] = None) -> bool:
+    """Check if a file path matches any of the given extensions."""
+    if extensions is None or len(extensions) == 0:
+        return True
+    logger.info(f"Checking if {path} matches extensions {extensions}")
+    logger.debug(f"Any extensions match? {any(path.name.endswith(ext) for ext in extensions)}")
+    return path.name.endswith("README.md") or any(path.name.endswith(ext) for ext in extensions)
+
 def _collect_files(
-    path: str,
+    path: Path,
     gitignore_rules: List[str],
-    processed_files: Set[str],
+    processed_files: Set[Path],
     next_index: int,
     extensions: Optional[Tuple[str, ...]] = None
 ) -> List[Document]:
@@ -178,26 +235,27 @@ def _collect_files(
     path_obj = Path(path)
     gitignore_root = str(path_obj if path_obj.is_dir() else path_obj.parent)
 
-    def process_file(file_path: str) -> None:
+    def process_file(file_path: Path) -> None:
         nonlocal current_index
-        if doc := _load_file(file_path, current_index, processed_files, extensions):
+        if doc := _load_file(file_path, current_index, processed_files):
             documents.append(doc)
             processed_files.add(file_path)
             current_index += 1
 
     if path_obj.is_file():
-        if not _should_ignore(str(path_obj), gitignore_rules, gitignore_root):
-            process_file(str(path_obj))
+        if not _should_ignore(path_obj, gitignore_rules, gitignore_root, extensions):
+            process_file(path_obj)
+    
     elif path_obj.is_dir():
         for root, dirs, files in os.walk(path_obj):
             dirs[:] = [d for d in dirs if not d.startswith(".")]
             files = [f for f in files if not f.startswith(".")]
 
-            dirs[:] = [d for d in dirs if not _should_ignore(os.path.join(root, d), gitignore_rules, gitignore_root)]
-            files = [f for f in files if not _should_ignore(os.path.join(root, f), gitignore_rules, gitignore_root)]
+            dirs[:] = [d for d in dirs if not _should_ignore(Path(os.path.join(root, d)), gitignore_rules, gitignore_root, extensions)]
+            files = [f for f in files if not _should_ignore(Path(os.path.join(root, f)), gitignore_rules, gitignore_root, extensions)]
 
             for file_name in sorted(files):
-                process_file(os.path.join(root, file_name))
+                process_file(Path(os.path.join(root, file_name)))
 
     return documents
 
@@ -291,9 +349,9 @@ def get_context(
 
             # Process parent READMEs first
             for readme_path in _find_parent_readmes(path, context_root=project_dir):
-                if doc := _load_file(str(readme_path), next_index, processed_files, extensions):
+                if doc := _load_file(readme_path, next_index, processed_files):
                     documents.append(doc)
-                    processed_files.add(str(readme_path))
+                    processed_files.add(readme_path)
                     next_index += 1
 
             # Process requested path
@@ -301,7 +359,7 @@ def get_context(
                 str(path) if path.is_dir() else str(path.parent)
             )
             new_docs = _collect_files(
-                str(path),
+                path,
                 gitignore_rules,
                 processed_files,
                 next_index,

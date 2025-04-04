@@ -55,7 +55,7 @@ class Claude(LLM):
         super().__init__(name, provider, system_prompt)
         self.anthropic = provider
 
-    async def _chat(self, prompt: str) -> Tuple[str, int, int]:
+    async def _chat(self, messages: List[Dict[str, str]]) -> Tuple[str, int, int]:
         """
         Execute a chat interaction using Claude.
         
@@ -71,13 +71,6 @@ class Claude(LLM):
             LLMError: If the API call fails, with context-specific suggestions
         """
         try:
-            # Build message history without system prompt
-            messages = []
-            for interaction in self.history:
-                messages.append({"role": "user", "content": interaction.prompt})
-                messages.append({"role": "assistant", "content": interaction.response})
-            messages.append({"role": "user", "content": prompt})
-            
             logger.debug("Claude request with %d messages", len(messages))
             
             # Make the API request with system as a top-level parameter
