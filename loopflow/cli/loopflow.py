@@ -144,22 +144,25 @@ def clarify(project_dir: Path, config: Optional[Path], debug: bool, checkpoint: 
         logger.error("Clarify failed: %s", str(e), exc_info=debug)
         click.echo(f"Error: {str(e)}", err=True)
         raise click.Abort()
-
+    
 @cli.command()
 @click.argument('project_dir', required=False, default=".", type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path))
 @click.option('--config', '-c', type=click.Path(exists=True, path_type=Path),
               help='Path to config file (default: ~/.loopflow/config.yaml)')
-@click.option('--mate', '-m', help='Specific mate to use (default: first mate in prompt)')
+@click.option('--mate', '-m', help='Specific mate to use (default: use full team)')
 @click.option('--debug', '-d', is_flag=True, help='Enable debug logging')
 @click.option('--checkpoint/--no-checkpoint', default=True, help='Enable/disable auto git checkpointing')
-def mate(project_dir: Path, config: Optional[Path], mate: Optional[str], debug: bool, checkpoint: bool):
-    """Generate drafts with a specific mate.
+def draft(project_dir: Path, config: Optional[Path], mate: Optional[str], debug: bool, checkpoint: bool):
+    """Generate drafts with either a specific mate or the full team.
+    
+    If using a specific mate, only the drafting phase is executed.
+    If no mate is specified, runs the full team workflow with review and synthesis.
     
     If PROJECT_DIR is omitted, the current directory (".") is used.
     """
     try:
         setup_logging(debug)
-        logger.info("Starting mate with project directory: %s", project_dir)
+        logger.info("Starting draft with project directory: %s", project_dir)
         
         # Find and parse loopflow.md
         prompt_file = find_loopflow_file(project_dir)
@@ -168,77 +171,43 @@ def mate(project_dir: Path, config: Optional[Path], mate: Optional[str], debug: 
         
         # Auto-checkpoint if enabled
         if checkpoint:
-            auto_checkpoint(project_dir, "mate", prompt)
+            auto_checkpoint(project_dir, "draft", prompt)
         
-        # Create session and pipeline
+        # Create session
         session, config_data = create_session(config, debug)
-        pipeline = MatePipeline(session, prompt, mate_name=mate)
+        
+        # Choose pipeline based on whether a specific mate was requested
+        if mate:
+            logger.info(f"Using single mate pipeline with: {mate}")
+            pipeline = MatePipeline(session, prompt, mate_name=mate)
+        else:
+            logger.info("Using full team pipeline")
+            pipeline = TeamPipeline(session, prompt)
         
         # Execute pipeline
         result = asyncio.run(pipeline.execute())
                 
         # Display results
         if result["status"] == "success":
-            click.echo(f"Generated {len(result.get('outputs', {}))} files with mate: {result.get('mate', 'unknown')}")
-            for path, content in result.get('outputs', {}).items():
-                click.echo(f"  - {path}: {len(content)} chars")
+            if mate:
+                # Single mate output
+                click.echo(f"Generated {len(result.get('outputs', {}))} files with mate: {result.get('mate', 'unknown')}")
+                for path, content in result.get('outputs', {}).items():
+                    click.echo(f"  - {path}: {len(content)} chars")
+            else:
+                # Team output
+                click.echo(f"Generated {len(result.get('outputs', {}))} files using team: {', '.join(result.get('team', []))}")
+                for path, _ in result.get('outputs', {}).items():
+                    click.echo(f"  - {path}")
         else:
             click.echo(f"Error: {result.get('error', 'Unknown error')}", err=True)
             if debug and 'context' in result:
                 click.echo(f"Context: {result['context']}")
         
-        logger.info("Mate completed with status: %s", result["status"])
+        logger.info("Draft completed with status: %s", result["status"])
         
     except Exception as e:
-        logger.error("Mate failed: %s", str(e), exc_info=debug)
-        click.echo(f"Error: {str(e)}", err=True)
-        raise click.Abort()
-
-@cli.command()
-@click.argument('project_dir', required=False, default=".", type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path))
-@click.option('--config', '-c', type=click.Path(exists=True, path_type=Path),
-              help='Path to config file (default: ~/.loopflow/config.yaml)')
-@click.option('--debug', '-d', is_flag=True, help='Enable debug logging')
-@click.option('--checkpoint/--no-checkpoint', default=True, help='Enable/disable auto git checkpointing')
-def team(project_dir: Path, config: Optional[Path], debug: bool, checkpoint: bool):
-    """Run the full team workflow (draft, review, synthesize).
-    
-    If PROJECT_DIR is omitted, the current directory (".") is used.
-    """
-    try:
-        setup_logging(debug)
-        logger.info("Starting team workflow with project directory: %s", project_dir)
-        
-        # Find and parse loopflow.md
-        prompt_file = find_loopflow_file(project_dir)
-        prompt = Prompt.from_file(prompt_file)
-        logger.info("Prompt parsed successfully from %s", prompt_file)
-        
-        # Auto-checkpoint if enabled
-        if checkpoint:
-            auto_checkpoint(project_dir, "team", prompt)
-
-        # Create session and pipeline
-        session, config_data = create_session(config, debug)
-        pipeline = TeamPipeline(session, prompt)
-        
-        # Execute pipeline
-        result = asyncio.run(pipeline.execute())
-                
-        # Display results
-        if result["status"] == "success":
-            click.echo(f"Generated {len(result.get('outputs', {}))} files using team: {', '.join(result.get('team', []))}")
-            for path, _ in result.get('outputs', {}).items():
-                click.echo(f"  - {path}")
-        else:
-            click.echo(f"Error: {result.get('error', 'Unknown error')}", err=True)
-            if debug and 'context' in result:
-                click.echo(f"Context: {result['context']}")
-        
-        logger.info("Team workflow completed with status: %s", result["status"])
-        
-    except Exception as e:
-        logger.error("Team workflow failed: %s", str(e), exc_info=debug)
+        logger.error("Draft failed: %s", str(e), exc_info=debug)
         click.echo(f"Error: {str(e)}", err=True)
         raise click.Abort()
 
@@ -299,8 +268,13 @@ def init(project_dir: Path, checkpoint: bool):
     """
     logger.info("Initializing new loopflow project in: %s", project_dir)
     
-    project_dir.mkdir(parents=True, exist_ok=True)
     prompt_path = project_dir / "loopflow.md"
+    if prompt_path.exists():
+        click.echo(f"loopflow.md already exists at {prompt_path}")
+        return
+
+    if not project_dir.exists():
+        project_dir.mkdir(parents=True, exist_ok=True)
     
     template = """# New Project
 
