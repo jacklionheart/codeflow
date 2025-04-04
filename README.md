@@ -5,21 +5,19 @@
 ## How it works
 
 loopflow has two primary interfaces:
-* the *loopflow.md*, which defines the prompt(s) sent to llms by defining Goals, Outputs, and other metadata
+* the *loopflow.md*, which defines the prompt(s) sent to llms by defining *goals*, *output_files*, and other metadata
 * the *loopflow CLI*, which executes commands.
 
 loopflow is built around "mates": LLMs with pre-defined system prompts to act in specific roles (currently: infrastructure engineer, research scientist). Commands can be run either against a specific mate or against a whole "team" of "mates", in which multiple LLMs handle requests and those responses are concatenated.
 
 ### Commands
 
-The loopflow commands:
-- **Clarify**: A suite of LLMs with different system prompts all receieve a request to ask clarifying questions
-- **Draft**: An LLM or team of LLMs will draft the specified output files to meet the specified goals.
-  - *Team Mode* (longer): Each mate generates a draft, reviews others' work, and one synthesizes the final result
-  - *Single Mate Mode* (faster): One mate directly drafts the file without review or synthesis
-- **Review**: A current drafts of the output files and provides feed.
-- **Rebase**: Loopflow is built to update files in-place and auto-commit in git so that git diff shows the changes in the output files
-made by the LLMs responding to loopflow requests. Rebase rebases to the latest non-loopflow commit.
+The core loopflow commands:
+- **Clarify**: Ask LLMs to generate questions to clarify the design.
+- **Draft**: Ask LLMs to generate the *output_files*.
+  -  *Single Mate Mode* (faster): One mate directly drafts each file
+  - *Team Mode* (longer): The mates both draft and then review eac others' work, and then one synthesizes the final result
+- **Review**: Asks LLMs to review the current drafts of the output files.
 
 To invoke:
 ```bash
