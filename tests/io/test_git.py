@@ -4,7 +4,7 @@ from loopflow.io.git import auto_checkpoint
 import loopflow.io.git as git_mod
 
 
-def test_auto_checkpoint_commits_on_dev_branch(monkeypatch, tmp_path: Path):
+def test_auto_checkpoint_commits_on_dev_branch(monkeypatch, tmp_path: Path, basic_prompt):
     """
     When auto-checkpointing is enabled (e.g. on a dev branch), auto_checkpoint should
     stage files and create a checkpoint commit.
@@ -31,7 +31,7 @@ def test_auto_checkpoint_commits_on_dev_branch(monkeypatch, tmp_path: Path):
     monkeypatch.setattr(git_mod, "stage_all_files", fake_stage_all_files)
     monkeypatch.setattr(git_mod, "create_checkpoint", fake_create_checkpoint)
 
-    result = auto_checkpoint(project_dir, "test_command", {"info": "details"})
+    result = auto_checkpoint(project_dir, "test_command", basic_prompt)
 
     assert result is True, "auto_checkpoint should return True on successful commit"
     assert stage_called, "stage_all_files should be called when checkpointing is enabled"

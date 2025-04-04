@@ -11,6 +11,7 @@ from .mock import MockUser, MockProvider
 def basic_prompt(tmp_path: Path):
     """Create a basic prompt for testing."""
     return Prompt(
+        path=tmp_path / "loopflow.md",
         goal="Build a simple test function",
         output_files=[tmp_path / "test_func.py"],
         team=["reviewer1", "reviewer2"],
