@@ -2,7 +2,7 @@ import SwiftUI
 import RealmSwift
 
 struct GlobalWaveformView: View {
-    @ObservedObject var trackAudio: TrackAudio
+    @ObservedObject var player: TrackPlayer
     @ObservedRealmObject var track: Track
     @State private var draggedMarker: MarkerType?
     @State private var pendingChange: (MarkerType, Double)?
@@ -65,7 +65,7 @@ struct GlobalWaveformView: View {
                 
                 // Playhead
                 TimelineMarkerView(
-                    position: CGFloat(trackAudio.currentPosition + track.startSeconds) / track.sourceDurationSeconds * geometry.size.width,
+                    position: CGFloat(player.currentPosition + track.startSeconds) / track.sourceDurationSeconds * geometry.size.width,
                     height: geometry.size.height,
                     color: .red,
                     width: 2,

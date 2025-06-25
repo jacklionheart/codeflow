@@ -3,10 +3,10 @@ import RealmSwift
 import AVFoundation
 
 class Recorder : ObservableObject {
-    var audioEngine: AVAudioEngine
-    public var trackManager: TrackSingleton
+    var engine: AVAudioEngine
+    public var playerRegistry: PlayerRegistry
 
-    @Published var avAudioRecorder: AVAudioRecorder?
+    private var avAudioRecorder: AVAudioRecorder?
     @Published var currentRecordingPath: URL?
     @Published var currentPitch: Pitch?
     @Published public var name: String
@@ -15,9 +15,9 @@ class Recorder : ObservableObject {
     private var startTime: Date?
     private var timer: Timer?
 
-    init(audioEngine: AVAudioEngine, trackManager: TrackSingleton) {
-        self.audioEngine = audioEngine
-        self.trackManager = trackManager
+    init(engine: AVAudioEngine, playerRegistry: PlayerRegistry) {
+        self.engine = engine
+        self.playerRegistry = playerRegistry
         pitchEstimator = PitchEstimator()
         avAudioRecorder = nil
         name = ""
@@ -31,7 +31,9 @@ class Recorder : ObservableObject {
 
     
     func startMonitoring() {
-        let input = audioEngine.inputNode
+        print("startMonitoring Current thread: \(Thread.current.isMainThread ? "Main" : "Background")")
+
+        let input = engine.inputNode
         let format = input.inputFormat(forBus: 0)
         
         print("inputFormat: \(input.inputFormat(forBus: 0))")
@@ -43,7 +45,10 @@ class Recorder : ObservableObject {
     }
 
     func stopMonitoring() {
-        audioEngine.inputNode.removeTap(onBus: 0)
+        print("stopMonitoring Current thread: \(Thread.current.isMainThread ? "Main" : "Background")")
+
+
+        engine.inputNode.removeTap(onBus: 0)
     }
     
     private static func newUrl(for date: Date) -> URL {
@@ -57,7 +62,9 @@ class Recorder : ObservableObject {
     }
     
     func start() {
-        
+        print("start Current thread: \(Thread.current.isMainThread ? "Main" : "Background")")
+
+
         let settings = [
             AVFormatIDKey: Int(kAudioFormatMPEG4AAC),
             AVSampleRateKey: 44100,
@@ -69,6 +76,7 @@ class Recorder : ObservableObject {
         if !active {
             do {
                 let date = Date()
+                print("start Current thread: \(Thread.current.isMainThread ? "Main" : "Background")")
                 currentRecordingPath = Recorder.newUrl(for: date)
                 avAudioRecorder = try AVAudioRecorder.init(url: currentRecordingPath!, settings: settings)
                 startTime = Date()
@@ -83,17 +91,22 @@ class Recorder : ObservableObject {
             } catch let error {
                 AppLogger.audio.error("audio.record.start Error starting recorder: \(error.localizedDescription)")
                 avAudioRecorder = nil
+                
+                print("start Current thread: \(Thread.current.isMainThread ? "Main" : "Background")")
                 currentRecordingPath = nil
             }
         }
     }
     
-    func stop(to: Track?) {
+    func stop(to: Section?) {
+        print("stop Current thread: \(Thread.current.isMainThread ? "Main" : "Background")")
+
+
         AppLogger.audio.info("audio.record.stop active:\(self.active) to:\(to)")
         if active {
             avAudioRecorder!.stop()
             stopMonitoring()
-            trackManager.stop()
+            playerRegistry.stopCurrent()
             timer = nil
             startTime = nil
             elapsedTime = 0
@@ -114,13 +127,20 @@ class Recorder : ObservableObject {
             writeToRealm {
                 // TODO: Get realm from session?
                 let realm = try! Realm()
+
                 let newTrack = Track(name: self.name, sourceURL: self.currentRecordingPath!.lastPathComponent)
                 realm.add(newTrack)
-                if to != nil {
-                    to!.thaw()!.addSubtrack(newTrack)
+
+                var section = to
+                if to == nil {
+                    section = Section(name: name + " Section")
+                    realm.add(section!)
                 }
+                
+                section!.thaw()!.addTrack(newTrack)
             }
             
+            print("stop Current thread: \(Thread.current.isMainThread ? "Main" : "Background")")
             currentRecordingPath = nil
         }
     }

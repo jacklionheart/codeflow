@@ -4,11 +4,11 @@ import RealmSwift
 struct LoopflowView: View {
     @EnvironmentObject var session: RealmSession
     @EnvironmentObject var audio: Audio
-    @ObservedResults(Track.self, where: { track in track.parent == nil }) var tracks
-    @State private var presentedTracks: [Track] = []
+    @ObservedResults(Section.self) var sections
+    @State private var presentedSections: [Section] = []
 
     var body: some View {
-        NavigationStack(path: $presentedTracks) {
+//        NavigationStack(path: $presentedTracks) {
             VStack {
                 HStack {
                     Text("Your Tracks")
@@ -16,16 +16,16 @@ struct LoopflowView: View {
                     Spacer()
                 }
                 List {
-                    ForEach(tracks) { track in
-                        PlayerView(track:track, trackAudio: audio.audio(for: track),
-                                   onEdit: {presentedTracks.append(track)})
+                    ForEach(sections) { section in
+                        PlayerView(player: audio.player(for: section.tracks[0]))
+//                                   onEdit: {presentedTracks.append(section)})
                     }
                 }.listStyle(PlainListStyle())
                 RecorderView(recorder: audio.record)
             }
-            .navigationDestination(for: Track.self) { track in
-                EditorView(audio: audio, track: track, trackAudio: audio.audio(for: track))
-            }
-        }
+//            .navigationDestination(for: Section.self) { track in
+//                EditorView(audio: audio, section: section, player: audio.audio(for: section))
+//            }
+//        }
     }
 }

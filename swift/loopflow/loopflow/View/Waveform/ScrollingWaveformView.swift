@@ -2,8 +2,8 @@ import SwiftUI
 import RealmSwift
 
 struct ScrollableWaveformView: View {
-    @ObservedObject var trackAudio: TrackAudio
-    @ObservedRealmObject var track: Track
+    @ObservedObject var player: Player
+    @ObservedRealmObject var loop: Loop
     @GestureState private var dragOffset: CGFloat = 0
     
     let barWidth: CGFloat = 2
@@ -18,7 +18,7 @@ struct ScrollableWaveformView: View {
                 VStack {
                     tickMarksView(geometry: geometry)
                     WaveformContentView(
-                        amplitudes: track.amplitudes,
+                        amplitudes: loop.amplitudes,
                         barWidth: barWidth,
                         barSpacing: barSpacing,
                         scaleX: 1,
@@ -47,8 +47,8 @@ struct ScrollableWaveformView: View {
     }
     
     private func tickMarksView(geometry: GeometryProxy) -> some View {
-        let pixelsPerSecond = (barWidth + barSpacing) * CGFloat(Track.AMPLITUDES_PER_SECOND)
-        let totalQuarterSeconds = Int(track.durationSeconds * 4) + 1
+        let pixelsPerSecond = (barWidth + barSpacing) * CGFloat(Loop.AMPLITUDES_PER_SECOND)
+        let totalQuarterSeconds = Int(loop.durationSeconds * 4) + 1
 
         return LazyHStack(spacing: 0) {
             ForEach(0..<totalQuarterSeconds, id: \.self) { index in
@@ -73,8 +73,8 @@ struct ScrollableWaveformView: View {
 
 
     private func calculateOffset(geometry: GeometryProxy) -> CGFloat {
-        let pixelsPerSecond = (barWidth + barSpacing) * CGFloat(Track.AMPLITUDES_PER_SECOND)
-        let currentPositionOffset = CGFloat(trackAudio.currentPosition) * pixelsPerSecond
+        let pixelsPerSecond = (barWidth + barSpacing) * CGFloat(Loop.AMPLITUDES_PER_SECOND)
+        let currentPositionOffset = CGFloat(player.currentPosition) * pixelsPerSecond
         let initialOffset = geometry.size.width / 2 // Center the waveform initially
         return initialOffset - currentPositionOffset
     }

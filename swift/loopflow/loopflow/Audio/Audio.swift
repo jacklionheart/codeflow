@@ -1,25 +1,25 @@
 import Foundation
 import AVFoundation
 
-class Audio : ObservableObject {
-    var audioEngine: AVAudioEngine
+class Audio: ObservableObject {
+    var engine: AVAudioEngine
+    var playerRegistry: PlayerRegistry
     @Published public var record: Recorder
-    @Published public var trackManager: TrackSingleton
 
-    func audio(for track: Track) -> TrackAudio {
-        return trackManager.audio(for: track)
+    func player(for loop: Loop) -> Player {
+        return playerRegistry.player(for: loop)
     }
     
-    func pause() {
-        return trackManager.pause()
+    func stop() {
+        return playerRegistry.stopCurrent()
     }
     
-    func play(_ trackAudio : TrackAudio) {
-        return trackManager.play(trackAudio)
+    func play(player: Player) {
+        return playerRegistry.play(player)
     }
     
     init() {
-        audioEngine = AVAudioEngine()
+        engine = AVAudioEngine()
         
         do {
             let audioSession = AVAudioSession.sharedInstance()
@@ -29,8 +29,8 @@ class Audio : ObservableObject {
             try audioSession.setActive(true)
             try audioSession.setInputGain(1.5)
             AppLogger.model.info("audio.init Active audio session")
-            print("inputFormat: \(audioEngine.inputNode.inputFormat(forBus: 0))")
-            print("outputFormat: \(audioEngine.inputNode.outputFormat(forBus: 0))")
+            print("inputFormat: \(engine.inputNode.inputFormat(forBus: 0))")
+            print("outputFormat: \(engine.inputNode.outputFormat(forBus: 0))")
 
         } catch {
             AppLogger.audio.error("audio.init Failed to set up audio session: \(error.localizedDescription)")
@@ -39,10 +39,10 @@ class Audio : ObservableObject {
             AppLogger.model.debug("audio.init starting audio engine")
             // Must access the mainMixerNode before starting the engine in order to ensure
             // the engine has the mainMixerNode -> mainOutputNode graph.
-            audioEngine.mainMixerNode.outputVolume = 1.0
-            try audioEngine.start()
-            print("after startung inputFormat: \(audioEngine.inputNode.inputFormat(forBus: 0))")
-            print("after starting outputFormat: \(audioEngine.inputNode.outputFormat(forBus: 0))")
+            engine.mainMixerNode.outputVolume = 1.0
+            try engine.start()
+            print("after startung inputFormat: \(engine.inputNode.inputFormat(forBus: 0))")
+            print("after starting outputFormat: \(engine.inputNode.outputFormat(forBus: 0))")
 
             AppLogger.model.info("audio.init audio engine start successful")
         }
@@ -50,9 +50,8 @@ class Audio : ObservableObject {
             AppLogger.audio.error("audio.init error starting audio engine: \(error)")
         }
 
-        let trackManager = TrackSingleton(audioEngine: audioEngine)
-        self.trackManager = trackManager
-        self.record = Recorder(audioEngine: audioEngine, trackManager: trackManager)
+        self.playerRegistry = PlayerRegistry(engine: engine)
+        self.record = Recorder(engine: engine, playerRegistry: playerRegistry)
     }
 }
   

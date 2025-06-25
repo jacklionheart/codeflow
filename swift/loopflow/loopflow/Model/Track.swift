@@ -10,151 +10,70 @@ import RealmSwift
 import AVFoundation
 import Accelerate
 
-class Track: Object, ObjectKeyIdentifiable {
+class Track: Loop {
+    //
+    // MARK: Persisted values
+    //
     
-    // MARK: Subtypes
+    @Persisted var sourceURL = ""
+    @Persisted var section: Section?
+    @Persisted var sourceDurationSeconds: Double
+
+    //
+    // MARK: Computed values
+    //
     
-    public enum Subtype: String {
-        case Recording
-        case Mix
-        case Sequence
+    
+    override var sourceAmplitudes : [CGFloat] {
+        return computeSourceAmplitudes()
     }
     
-    // MARK: Persisted values
+    override var sourceStopSeconds : Double {
+        return sourceDurationSeconds
+    }
     
-    @Persisted(primaryKey: true) var _id: ObjectId
-    @Persisted var name = ""
-    @Persisted var creationDate = Date()
-    // Start time (in seconds).
-    @Persisted var startSeconds = 0.0
-    // Stop time (in seconds)
-    @Persisted var stopSeconds = 0.0
-    @Persisted var sourceDurationSeconds = 0.0
-    
-    // Cents of pitch shift (-2400, 2400)
-    @Persisted var pitchCents = 0.0
-    
-    @Persisted var playbackRate = 1.0
-    @Persisted var sourceURL = ""
-    @Persisted var subtracks = RealmSwift.List<Track>()
-    @Persisted var parent: Track?
-    @Persisted var creator: Person?
-    @Persisted var volume = 1.0
-    @Persisted var subtypeRaw = Subtype.Recording.rawValue
-    
-    // MARK: Computed values
-    
-    lazy var sourceAmplitudes : [CGFloat] = computeSourceAmplitudes()
+    override func createPlayer(parent: AVAudioNode) -> Player {
+        return TrackPlayer(self, parent: parent)
+    }
     
     lazy var audioFile : AVAudioFile = loadAudioFile()
     
-    var format: AVAudioFormat {
-            if subtype == .Recording {
-                return audioFile.processingFormat
-            } else {
-                assert(subtype == .Mix)
-                assert(subtracks.count > 0)
-                return subtracks[0].format
-        }
+    override var format: AVAudioFormat {
+        return audioFile.processingFormat
     }
     
-    var durationSeconds: Double {
-        return stopSeconds - startSeconds
-    }
-    
-    var amplitudes: [CGFloat] {
-        let startIndex = Int(startSeconds * Track.AMPLITUDES_PER_SECOND)
-        let endIndex = min(Int(stopSeconds * Track.AMPLITUDES_PER_SECOND), sourceAmplitudes.count)
-        return Array(sourceAmplitudes[startIndex..<endIndex])
-    }
 
-        
-    // MARK: Initializers
-    
-    convenience init(name: String, sourceURL: String) {
-        self.init()
-        self.name = name
-        self.sourceURL = sourceURL
-        audioFile = loadAudioFile()
-        sourceDurationSeconds = Double(audioFile.length) / audioFile.fileFormat.sampleRate
-        stopSeconds = sourceDurationSeconds
-        AppLogger.model.info("Track.init")
-        AppLogger.model.info("Duration (s) \(self.sourceDurationSeconds)")
-        AppLogger.model.info("Creating Track: \(name)")
-        AppLogger.model.info("URL: \(sourceURL)")
-    }
-    
-    // MARK: Audio-facing API
-    
-    // `subtype` determines the behavior a track object in the UX.
-    // An alternative design would have been to use inheritance between
-    // different objects.
-    // However, Realm support for object inheritance is somewhat limited,
-    // and so sharing a single Object type creates more freedom at the database
-    // level.
     //
-    var subtype: Subtype {
-        get {
-            return Subtype(rawValue: subtypeRaw) ?? .Recording
-        }
-        set {
-            subtypeRaw = newValue.rawValue
-        }
-    }
+    // MARK: STATIC
+    //
     
-    // `convertToMix` converts a Recording-type track
-    // to an Mix by making a new subtrack which is a copy of this track,
-    // and then converting this track into an Mix type.
-    public func convertToMix() {
-        assert(subtype == .Recording)
 
-        let newTrack = createCopy()
-        subtype = .Mix
-        addSubtrack(newTrack)
-        sourceURL = ""
-        resetMix()
+    static func fileDirectory() -> URL {
+        FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
     }
     
-    public func addSubtrack(_ subtrack: Track) {
-        assert(subtrack.parent == nil)
-        if subtype == Subtype.Recording {
-            self.convertToMix()
-        }
+    //
+    // MARK: Computation
+    //
         
-        subtracks.append(subtrack)
-        subtrack.parent = self
-    }
-    
-    public func resetMix() {
-        volume = 1.0
-        pitchCents = 0.0
-        playbackRate = 1.0
-        startSeconds = 0
-        stopSeconds = sourceDurationSeconds
-    }
-    
-    public static var AMPLITUDES_PER_SECOND = 20.0;
     private func computeSourceAmplitudes() -> [CGFloat] {
-        let avAudioFile = audioFile
-        let sampleRate = avAudioFile.fileFormat.sampleRate
         let samplesPerAmplitude = Int(sampleRate / Track.AMPLITUDES_PER_SECOND)
-        let totalFrames = AVAudioFramePosition(sourceDurationSeconds * sampleRate)
-        let numberOfAmplitudes = Int(totalFrames) / samplesPerAmplitude
+        let numberOfAmplitudes = Int(frameCount) / samplesPerAmplitude
         
         var amplitudes = [CGFloat](repeating: 0, count: numberOfAmplitudes)
         
-        avAudioFile.framePosition = 0
+        audioFile.framePosition = 0
         
         let bufferSize = AVAudioFrameCount(samplesPerAmplitude)
-        guard let buffer = AVAudioPCMBuffer(pcmFormat: avAudioFile.processingFormat, frameCapacity: bufferSize) else {
+        guard let buffer = AVAudioPCMBuffer(pcmFormat: audioFile.processingFormat, frameCapacity: bufferSize) else {
             return amplitudes
         }
         
-        let channelCount = Int(avAudioFile.processingFormat.channelCount)
+        let channelCount = Int(format.channelCount)
         
         for i in 0..<numberOfAmplitudes {
             do {
-                try avAudioFile.read(into: buffer)
+                try audioFile.read(into: buffer)
                 
                 var sumAmplitude: Float = 0
                 
@@ -174,10 +93,8 @@ class Track: Object, ObjectKeyIdentifiable {
         
         return amplitudes
     }
-
-    public func loadAudioFile() -> AVAudioFile {
-        assert(subtype == Subtype.Recording)
-        
+    
+    private func loadAudioFile() -> AVAudioFile {
         let audioURL = Track.fileDirectory().appendingPathComponent(sourceURL)
         // TODO: This is meant to be memoized, but we end up getting new versions of the Track object
         // so we're actually loading the audio file over and over.
@@ -189,30 +106,25 @@ class Track: Object, ObjectKeyIdentifiable {
             fatalError(error.localizedDescription)
         }
     }
+    
+  
 
-    // MARK: Private Manipulation
- 
-    private func createCopy() -> Track {
-        assert(subtype == .Recording)
-        let newTrack = Track()
-        newTrack.name = name
-        newTrack.creationDate = creationDate
-        newTrack.creator = creator
-        newTrack.sourceURL = sourceURL
-        newTrack.sourceDurationSeconds = sourceDurationSeconds
-        newTrack.volume = volume
-        newTrack.pitchCents = pitchCents
-        // parent is not copied
-        return newTrack
-    }
+    // MARK: Initializers
     
-    //
-    // MARK: STATIC
-    //
-    
-    static func fileDirectory() -> URL {
-        FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+    convenience init(name: String, sourceURL: String) {
+        self.init()
+        self.name = name
+        self.sourceURL = sourceURL
+        audioFile = loadAudioFile()
+        sourceDurationSeconds = Double(audioFile.length) / audioFile.processingFormat.sampleRate
+        stopSeconds = sourceDurationSeconds
+        AppLogger.model.info("Track.init")
+        AppLogger.model.info("Duration (s) \(self.sourceDurationSeconds)")
+        AppLogger.model.info("Creating Track: \(name)")
+        AppLogger.model.info("URL: \(sourceURL)")
     }
+
+    
     
 }
 

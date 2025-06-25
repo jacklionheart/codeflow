@@ -3,7 +3,7 @@ import SwiftUI
 struct RecorderView: View {
     @ObservedObject var recorder: Recorder
 
-    var parent: Track?
+    var section: Section?
     var body: some View {
         VStack {
             Spacer()
@@ -18,7 +18,7 @@ struct RecorderView: View {
                 recorder.start()
             }, stop: {
                 AppLogger.ui.debug("RecorderView stop")
-                recorder.stop(to: parent)
+                recorder.stop(to: section)
             })
         }
         .frame(maxWidth: .infinity, maxHeight: recorder.active ? 200 : 100)
