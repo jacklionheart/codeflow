@@ -1,7 +1,7 @@
 import pytest
 from pathlib import Path
-from loopflow.io.git import auto_checkpoint
-import loopflow.io.git as git_mod
+from codeflow.io.git import auto_checkpoint
+import codeflow.io.git as git_mod
 
 
 def test_auto_checkpoint_commits_on_dev_branch(monkeypatch, tmp_path: Path, basic_prompt):

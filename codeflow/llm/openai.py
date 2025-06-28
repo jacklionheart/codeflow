@@ -1,5 +1,5 @@
 """
-OpenAI GPT implementation for loopflow.
+OpenAI GPT implementation for codeflow.
 
 This module provides the concrete implementation for interacting with
 OpenAI's Chat API, with each instance maintaining its own conversation history.

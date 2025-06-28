@@ -1,5 +1,5 @@
 """
-Job implementations for loopflow.
+Job implementations for codeflow.
 
 This module defines the basic jobs that can be executed as part of a pipeline.
 Each job represents a specific task like clarifying requirements, drafting files,
@@ -11,11 +11,11 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Union
 
-from loopflow.compose.prompt import Prompt
-from loopflow.io.file import get_context
-from loopflow.llm.mate import Team
-from loopflow.io.session import Session
-from loopflow.templates import (
+from codeflow.compose.prompt import Prompt
+from codeflow.io.file import get_context
+from codeflow.llm.mate import Team
+from codeflow.io.session import Session
+from codeflow.templates import (
     QUESTION_TEMPLATE,
     DRAFT_TEMPLATE,
     REVIEW_TEMPLATE,
@@ -49,7 +49,7 @@ class Job(ABC):
         """
         self.session = session
         self.prompt = prompt
-        self.logger = logging.getLogger(f"loopflow.job.{self.__class__.__name__.lower()}")
+        self.logger = logging.getLogger(f"codeflow.job.{self.__class__.__name__.lower()}")
     
     @abstractmethod
     async def execute(self, **kwargs) -> Dict[str, Any]:

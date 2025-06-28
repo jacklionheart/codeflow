@@ -1,5 +1,5 @@
 """
-Pipeline implementation for loopflow.
+Pipeline implementation for codeflow.
 
 This module defines pipelines that orchestrate jobs to execute specific workflows
 for the composer CLI. Each pipeline combines one or more jobs to accomplish
@@ -14,9 +14,9 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, Any, Optional
 
-from loopflow.compose.prompt import Prompt
-from loopflow.io.session import Session
-from loopflow.compose.job import Clarify, Draft, Review, Synthesize, JobError
+from codeflow.compose.prompt import Prompt
+from codeflow.io.session import Session
+from codeflow.compose.job import Clarify, Draft, Review, Synthesize, JobError
 
 logger = logging.getLogger(__name__)
 
@@ -49,7 +49,7 @@ class Pipeline(ABC):
         self.start_time = datetime.now()
         self.end_time: Optional[datetime] = None
         self._temp_dir: Optional[Path] = None
-        self.logger = logging.getLogger(f"loopflow.pipeline.{self.__class__.__name__.lower()}")
+        self.logger = logging.getLogger(f"codeflow.pipeline.{self.__class__.__name__.lower()}")
     
     @abstractmethod
     async def execute(self) -> Dict[str, Any]:

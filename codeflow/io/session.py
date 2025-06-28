@@ -1,10 +1,10 @@
 """
-Session implementation for loopflow.
+Session implementation for codeflow.
 
 The Session class provides a shared environment for both the chat server
 and composer CLI, handling provider setup, team management, and basic 
 configuration. This serves as the core object shared across different
-loopflow applications.
+codeflow applications.
 """
 
 import asyncio
@@ -16,7 +16,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, Optional, Any, List, Callable
 
-from loopflow.llm import LLMProvider, LLM, Anthropic, OpenAI, Team
+from codeflow.llm import LLMProvider, LLM, Anthropic, OpenAI, Team
 
 logger = logging.getLogger(__name__)
 
@@ -118,7 +118,7 @@ class DiscordUser(User):
         self.user_id = user_id
         self.send_message = message_callback
         self.pending_responses = {}
-        self.logger = logging.getLogger(f"loopflow.user.discord.{user_id}")
+        self.logger = logging.getLogger(f"codeflow.user.discord.{user_id}")
     
     async def chat(self, prompt: str) -> str:
         """
@@ -186,7 +186,7 @@ class DiscordUser(User):
 
 @dataclass
 class Config:
-    """Configuration for loopflow session."""
+    """Configuration for codeflow session."""
     config_path: Optional[Path] = None
     anthropic_api_key: Optional[str] = None
     openai_api_key: Optional[str] = None
@@ -214,7 +214,7 @@ class Session:
         """
         self.user = user if user is not None else CLIUser()
         self.config = config or Config()
-        self.logger = logging.getLogger("loopflow.session")
+        self.logger = logging.getLogger("codeflow.session")
         self.providers: Dict[str, LLMProvider] = {}
         self.available_llms: Dict[str, LLM] = {}
         self.timeout = self.config.timeout
@@ -249,7 +249,7 @@ class Session:
             self._load_config_file()
         else:
             # Try default location
-            default_config = Path.home() / ".loopflow" / "config.yaml"
+            default_config = Path.home() / ".codeflow" / "config.yaml"
             if default_config.exists():
                 self._load_config_file(default_config)
         
@@ -305,7 +305,7 @@ class Session:
         self.logger.debug("Loading teammate configurations")
         
         # Load teammate definitions
-        from loopflow.templates import load_all_teammates
+        from codeflow.templates import load_all_teammates
         teammates = load_all_teammates()
         self.logger.info(f"Loaded {len(teammates)} teammate configurations")
         

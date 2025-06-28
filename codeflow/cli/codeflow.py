@@ -1,8 +1,8 @@
-# loopflow/cli/loopflow.py
+# codeflow/cli/codeflow.py
 """
-Command-line interface for loopflow.
+Command-line interface for codeflow.
 
-This module provides the main entry points for running loopflow from the
+This module provides the main entry points for running codeflow from the
 command line. It handles command parsing, configuration loading, and
 execution setup while delegating the actual work to the pipelines.
 """
@@ -15,17 +15,17 @@ from pathlib import Path
 import click
 from typing import Optional, Dict, Any, Tuple
 
-from loopflow.io.session import Session, Config, CLIUser
-from loopflow.compose.prompt import Prompt
-from loopflow.compose.pipeline import (
+from codeflow.io.session import Session, Config, CLIUser
+from codeflow.compose.prompt import Prompt
+from codeflow.compose.pipeline import (
     ClarifyPipeline, 
     MatePipeline, 
     TeamPipeline, 
     ReviewPipeline,
 )
-from loopflow.io.git import auto_checkpoint, find_last_non_loopflow_commit, rebase_to_commit
+from codeflow.io.git import auto_checkpoint, find_last_non_codeflow_commit, rebase_to_commit
 
-logger = logging.getLogger("loopflow.cli")
+logger = logging.getLogger("codeflow.cli")
 
 class ConfigError(Exception):
     """Exception raised for configuration errors."""
@@ -35,28 +35,28 @@ class ProjectError(Exception):
     """Exception raised for project structure errors."""
     pass
 
-def find_loopflow_file(project_dir: Path) -> Path:
+def find_codeflow_file(project_dir: Path) -> Path:
     """
-    Find the loopflow.md file in the project directory.
+    Find the codeflow.md file in the project directory.
     
     Args:
         project_dir: Directory to search in
         
     Returns:
-        Path to the loopflow.md file
+        Path to the codeflow.md file
         
     Raises:
-        ProjectError: If loopflow.md file is not found
+        ProjectError: If codeflow.md file is not found
     """
-    loopflow_file = project_dir / "loopflow.md"
+    codeflow_file = project_dir / "codeflow.md"
     
-    if not loopflow_file.exists():
+    if not codeflow_file.exists():
         raise ProjectError(
-            f"loopflow.md not found in {project_dir}. "
-            f"Run 'loopflow init {project_dir}' to create a new project."
+            f"codeflow.md not found in {project_dir}. "
+            f"Run 'codeflow init {project_dir}' to create a new project."
         )
     
-    return loopflow_file
+    return codeflow_file
 
 def setup_logging(debug: bool) -> None:
     """Configure logging with appropriate level and format."""
@@ -67,7 +67,7 @@ def setup_logging(debug: bool) -> None:
         datefmt='%Y-%m-%d %H:%M:%S'
     )
     logging.getLogger().setLevel(logging.INFO)
-    logger = logging.getLogger("loopflow")
+    logger = logging.getLogger("codeflow")
     logger.setLevel(log_level)
 
 def create_session(config_path: Optional[Path], debug: bool) -> Tuple[Session, Dict[str, Any]]:
@@ -95,13 +95,13 @@ def create_session(config_path: Optional[Path], debug: bool) -> Tuple[Session, D
 
 @click.group()
 def cli():
-    """Loopflow - Orchestrate LLM collaboration for file generation."""
+    """Codeflow - Orchestrate LLM collaboration for file generation."""
     pass
 
 @cli.command()
 @click.argument('project_dir', required=False, default=".", type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path))
 @click.option('--config', '-c', type=click.Path(exists=True, path_type=Path),
-              help='Path to config file (default: ~/.loopflow/config.yaml)')
+              help='Path to config file (default: ~/.codeflow/config.yaml)')
 @click.option('--debug', '-d', is_flag=True, help='Enable debug logging')
 @click.option('--checkpoint/--no-checkpoint', default=True, help='Enable/disable auto git checkpointing')
 def clarify(project_dir: Path, config: Optional[Path], debug: bool, checkpoint: bool):
@@ -113,8 +113,8 @@ def clarify(project_dir: Path, config: Optional[Path], debug: bool, checkpoint: 
         setup_logging(debug)
         logger.info("Starting clarify with project directory: %s", project_dir)
         
-        # Find and parse loopflow.md
-        prompt_file = find_loopflow_file(project_dir)
+        # Find and parse codeflow.md
+        prompt_file = find_codeflow_file(project_dir)
         prompt = Prompt.from_file(prompt_file)
         logger.info("Prompt parsed successfully from %s", prompt_file)
         
@@ -132,7 +132,7 @@ def clarify(project_dir: Path, config: Optional[Path], debug: bool, checkpoint: 
         # Display results
         if result["status"] == "success":
             click.echo("Questions have been appended to the prompt file.")
-            click.echo("Please add your answers and then run 'loopflow team' or 'loopflow mate'.")
+            click.echo("Please add your answers and then run 'codeflow team' or 'codeflow mate'.")
         else:
             click.echo(f"Error: {result.get('error', 'Unknown error')}", err=True)
             if debug and 'context' in result:
@@ -148,7 +148,7 @@ def clarify(project_dir: Path, config: Optional[Path], debug: bool, checkpoint: 
 @cli.command()
 @click.argument('project_dir', required=False, default=".", type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path))
 @click.option('--config', '-c', type=click.Path(exists=True, path_type=Path),
-              help='Path to config file (default: ~/.loopflow/config.yaml)')
+              help='Path to config file (default: ~/.codeflow/config.yaml)')
 @click.option('--mate', '-m', help='Specific mate to use (default: use full team)')
 @click.option('--debug', '-d', is_flag=True, help='Enable debug logging')
 @click.option('--checkpoint/--no-checkpoint', default=True, help='Enable/disable auto git checkpointing')
@@ -164,8 +164,8 @@ def draft(project_dir: Path, config: Optional[Path], mate: Optional[str], debug:
         setup_logging(debug)
         logger.info("Starting draft with project directory: %s", project_dir)
         
-        # Find and parse loopflow.md
-        prompt_file = find_loopflow_file(project_dir)
+        # Find and parse codeflow.md
+        prompt_file = find_codeflow_file(project_dir)
         prompt = Prompt.from_file(prompt_file)
         logger.info("Prompt parsed successfully from %s", prompt_file)
         
@@ -214,7 +214,7 @@ def draft(project_dir: Path, config: Optional[Path], mate: Optional[str], debug:
 @cli.command()
 @click.argument('project_dir', required=False, default=".", type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path))
 @click.option('--config', '-c', type=click.Path(exists=True, path_type=Path),
-              help='Path to config file (default: ~/.loopflow/config.yaml)')
+              help='Path to config file (default: ~/.codeflow/config.yaml)')
 @click.option('--debug', '-d', is_flag=True, help='Enable debug logging')
 @click.option('--checkpoint/--no-checkpoint', default=True, help='Enable/disable auto git checkpointing')
 def review(project_dir: Path, config: Optional[Path], debug: bool, checkpoint: bool):
@@ -226,8 +226,8 @@ def review(project_dir: Path, config: Optional[Path], debug: bool, checkpoint: b
         setup_logging(debug)
         logger.info("Starting review with project directory: %s", project_dir)
         
-        # Find and parse loopflow.md
-        prompt_file = find_loopflow_file(project_dir)
+        # Find and parse codeflow.md
+        prompt_file = find_codeflow_file(project_dir)
         prompt = Prompt.from_file(prompt_file)
         logger.info("Prompt parsed successfully from %s", prompt_file)
         
@@ -262,15 +262,15 @@ def review(project_dir: Path, config: Optional[Path], debug: bool, checkpoint: b
 @click.argument('project_dir', required=False, default=".", type=click.Path(path_type=Path))
 @click.option('--checkpoint/--no-checkpoint', default=True, help='Enable/disable auto git checkpointing')
 def init(project_dir: Path, checkpoint: bool):
-    """Initialize a new loopflow project directory.
+    """Initialize a new codeflow project directory.
     
     If PROJECT_DIR is omitted, the current directory (".") is used.
     """
-    logger.info("Initializing new loopflow project in: %s", project_dir)
+    logger.info("Initializing new codeflow project in: %s", project_dir)
     
-    prompt_path = project_dir / "loopflow.md"
+    prompt_path = project_dir / "codeflow.md"
     if prompt_path.exists():
-        click.echo(f"loopflow.md already exists at {prompt_path}")
+        click.echo(f"codeflow.md already exists at {prompt_path}")
         return
 
     if not project_dir.exists():
@@ -296,12 +296,12 @@ merlin
     if checkpoint:
         # Load an empty config
         config_data = {}
-        auto_checkpoint(project_dir, "init", {"files": ["loopflow.md"]})
+        auto_checkpoint(project_dir, "init", {"files": ["codeflow.md"]})
 
     prompt_path.write_text(template)
-    logger.info("Created new loopflow file at: %s", prompt_path)
-    click.echo(f"Created new loopflow project in {project_dir}")
-    click.echo(f"Created loopflow.md configuration file at {prompt_path}")
+    logger.info("Created new codeflow file at: %s", prompt_path)
+    click.echo(f"Created new codeflow project in {project_dir}")
+    click.echo(f"Created codeflow.md configuration file at {prompt_path}")
     
     # Create src directory
     src_dir = project_dir / "src"
@@ -312,29 +312,29 @@ merlin
 @cli.command()
 @click.argument('project_dir', required=False, default=".", type=click.Path(exists=True, file_okay=False, dir_okay=True, path_type=Path))
 def rebase(project_dir: Path):
-    """Rebase to before loopflow checkpoints.
+    """Rebase to before codeflow checkpoints.
     
     If PROJECT_DIR is omitted, the current directory (".") is used.
     """
     try:
-        logger.info("Looking for last non-loopflow commit")
+        logger.info("Looking for last non-codeflow commit")
         
-        # Find the last non-loopflow commit
-        commit_hash = find_last_non_loopflow_commit(project_dir)
+        # Find the last non-codeflow commit
+        commit_hash = find_last_non_codeflow_commit(project_dir)
         if not commit_hash:
-            click.echo("No non-loopflow commits found. Repository may be new or completely made with loopflow.")
+            click.echo("No non-codeflow commits found. Repository may be new or completely made with codeflow.")
             return
             
         # Confirm with user
-        click.echo(f"Found last non-loopflow commit: {commit_hash[:8]}")
-        if not click.confirm("Rebase to this commit? This will remove all loopflow checkpoint commits but preserve your changes."):
+        click.echo(f"Found last non-codeflow commit: {commit_hash[:8]}")
+        if not click.confirm("Rebase to this commit? This will remove all codeflow checkpoint commits but preserve your changes."):
             click.echo("Rebase cancelled.")
             return
             
         # Perform the rebase
         if rebase_to_commit(project_dir, commit_hash):
             click.echo(f"Successfully rebased to commit {commit_hash[:8]}")
-            click.echo("All loopflow checkpoint commits have been squashed, but your changes are preserved.")
+            click.echo("All codeflow checkpoint commits have been squashed, but your changes are preserved.")
         else:
             click.echo("Rebase failed. You may need to resolve conflicts manually.")
             

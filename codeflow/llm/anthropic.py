@@ -1,5 +1,5 @@
 """
-Anthropic Claude implementation for loopflow.
+Anthropic Claude implementation for codeflow.
 
 This module provides the concrete implementation for interacting with
 Anthropic's Claude model, with each instance maintaining its own chat context.

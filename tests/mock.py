@@ -5,7 +5,7 @@ from typing import Dict, Any, Optional, List, Tuple
 import asyncio
 from unittest.mock import AsyncMock, MagicMock
 
-from loopflow.llm import LLM, UsageStats, LLMProvider
+from codeflow.llm import LLM, UsageStats, LLMProvider
 
 class MockLLM(LLM):
     """A mock LLM for testing."""

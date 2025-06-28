@@ -1,5 +1,5 @@
 """
-Template and team member management for loopflow.
+Template and team member management for codeflow.
 
 This module provides access to both prompt templates and team member
 configurations used throughout the workflow. Templates and member configs
@@ -11,7 +11,7 @@ import importlib.resources
 from pathlib import Path
 from typing import Dict, List
 
-from loopflow.llm.mate import MateConfig
+from codeflow.llm.mate import MateConfig
 
 def load_resource(category: str, name: str) -> str:
     """

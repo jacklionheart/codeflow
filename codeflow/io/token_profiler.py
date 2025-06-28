@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple, Union, Set, Any
 
-from loopflow.io.file import get_context
+from codeflow.io.file import get_context
 
 @dataclass 
 class TokenNode:
@@ -256,7 +256,7 @@ def generate_flamegraph(data: Dict[str, Any], output_path: str, title: str = "Fl
     total_tokens = data.get('total_tokens', 0)
     common_prefix = data.get('common_prefix', '')
     
-    logger = logging.getLogger("loopflow.io.token_profiler")
+    logger = logging.getLogger("codeflow.io.token_profiler")
     logger.debug(f"Using common prefix: {common_prefix}")
     
     # Convert node cache to hierarchical dictionary with trimmed paths

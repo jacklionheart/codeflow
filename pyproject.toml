@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "loopflow"
+name = "codeflow"
 version = "0.2.0"
 description = "Orchestrate LLM collaboration for file generation"
 requires-python = ">=3.11"
@@ -18,11 +18,11 @@ dependencies = [
 ]
 
 [project.scripts]
-loopflow = "loopflow.cli.loopflow:cli"
-code-context = "loopflow.cli.code_context:cli"
+codeflow = "codeflow.cli.codeflow:cli"
+code-context = "codeflow.cli.code_context:cli"
 
 [tool.hatch.build.targets.wheel]
-packages = ["loopflow"]
+packages = ["codeflow"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
@@ -30,4 +30,4 @@ testpaths = ["tests"]
 asyncio_default_fixture_loop_scope = "function"
 
 [tool.hatch.build.targets.wheel.force-include]
-"loopflow/templates/" = "loopflow/templates"
+"codeflow/templates/" = "codeflow/templates"

@@ -4,14 +4,14 @@ import pytest
 from pathlib import Path
 from textwrap import dedent
 
-from loopflow.compose.prompt import Prompt
+from codeflow.compose.prompt import Prompt
 from .mock import MockUser, MockProvider
 
 @pytest.fixture
 def basic_prompt(tmp_path: Path):
     """Create a basic prompt for testing."""
     return Prompt(
-        path=tmp_path / "loopflow.md",
+        path=tmp_path / "codeflow.md",
         goal="Build a simple test function",
         output_files=[tmp_path / "test_func.py"],
         team=["reviewer1", "reviewer2"],

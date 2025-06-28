@@ -1,18 +1,18 @@
-# loopflow
+# codeflow
 
-**loopflow** is a workflow system for a graphs of structured llm requests for codegen.
+**codeflow** is a workflow system for a graphs of structured llm requests for codegen.
 
 ## How it works
 
-loopflow has two primary interfaces:
-* the *loopflow.md*, which defines the prompt(s) sent to llms by defining *goals*, *output_files*, and other metadata
-* the *loopflow CLI*, which executes commands.
+codeflow has two primary interfaces:
+* the *codeflow.md*, which defines the prompt(s) sent to llms by defining *goals*, *output_files*, and other metadata
+* the *codeflow CLI*, which executes commands.
 
-loopflow is built around "mates": LLMs with pre-defined system prompts to act in specific roles (currently: infrastructure engineer, research scientist). Commands can be run either against a specific mate or against a whole "team" of "mates", in which multiple LLMs handle requests and those responses are concatenated.
+codeflow is built around "mates": LLMs with pre-defined system prompts to act in specific roles (currently: infrastructure engineer, research scientist). Commands can be run either against a specific mate or against a whole "team" of "mates", in which multiple LLMs handle requests and those responses are concatenated.
 
 ### Commands
 
-The core loopflow commands:
+The core codeflow commands:
 - **Clarify**: Ask LLMs to generate questions to clarify the design.
 - **Draft**: Ask LLMs to generate the *output_files*.
   -  *Single Mate Mode* (faster): One mate directly drafts each file
@@ -21,21 +21,21 @@ The core loopflow commands:
 
 To invoke:
 ```bash
-# Initialize a new loopflow project
-loopflow init [project_dir]
+# Initialize a new codeflow project
+codeflow init [project_dir]
 # Generate questions to clarify requirements
-loopflow clarify [project_dir]
+codeflow clarify [project_dir]
 # Draft files (uses full team by default with a draft->review->synthesize subpipeline)
-loopflow draft [project_dir] [--mate <mate_name>]
+codeflow draft [project_dir] [--mate <mate_name>]
 # Review existing files and append feedback
-loopflow review [project_dir]
-# Reset git history to before loopflow checkpoints
-loopflow rebase [project_dir]
+codeflow review [project_dir]
+# Reset git history to before codeflow checkpoints
+codeflow rebase [project_dir]
 ```
 
 ### Team Members
 
-loopflow is built around the general idea of "mates". Many different mates could be defined for different contexts.
+codeflow is built around the general idea of "mates". Many different mates could be defined for different contexts.
 
 The following two are the defaults currently available:
 - maya: infrastructure engineer at a large tech company, focused on simplicity and robustness
@@ -45,22 +45,22 @@ You can add mates in `templates/mates`; simply creating the file is sufficient f
 
 ### Prompt Files
 
-You can create a prompt file template with `loopflow init`. 
+You can create a prompt file template with `codeflow init`. 
 
 They should look like this:
 ```markdown
-# Loopflow LLM Implementation
+# Codeflow LLM Implementation
 
 ## Goal
-Implement the LLM API for loopflow, a tool for generating code with teams of LLMs.
+Implement the LLM API for codeflow, a tool for generating code with teams of LLMs.
 
 ## Output
-loopflow/llm/llm.py
-loopflow/llm/anthropic.py
-loopflow/tests/test_llm.py
+codeflow/llm/llm.py
+codeflow/llm/anthropic.py
+codeflow/tests/test_llm.py
 
 ## Context
-loopflow/
+codeflow/
 
 ## Team
 maya
@@ -69,8 +69,8 @@ merlin
 
 ## `code-context`: For providing code context to LLMs Web UI
 
-Key to loopflow is submitting the right context, i.e. subset of the codebase as a reference. This is
-a part of how loopflow works, but installing loopflow also installs a `code-context` binary that is
+Key to codeflow is submitting the right context, i.e. subset of the codebase as a reference. This is
+a part of how codeflow works, but installing codeflow also installs a `code-context` binary that is
 used to copy codebase subsets to the clipboard or other output streams.
 
 code-context is a spiritual descendent of [files-to-prompt](https://github.com/simonw/files-to-prompt), 
@@ -103,7 +103,7 @@ Requires Python 3.11+
 pip install -e .
 ```
 
-Contact jack@loopflow.studio with any questions. Kinks likely not ironed out.
+Contact jack@codeflow.studio with any questions. Kinks likely not ironed out.
 
 You must set `ANTHROPIC_API_KEY` and/or `OPENAI_API_KEY` in your environment to use those providers.
 

@@ -6,7 +6,7 @@ Parsing user prompt markdown files
 from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Optional   
-import loopflow.io.file
+import codeflow.io.file
 
 class PromptError(Exception):
     """Exception raised for errors in the prompt file."""
@@ -15,7 +15,7 @@ class PromptError(Exception):
 # Update prompt.py to add validation and path handling:
 
 class Prompt:
-    """Represents a parsed loopflow prompt file."""
+    """Represents a parsed codeflow prompt file."""
     def __init__(
         self, 
         path: Path,
@@ -37,7 +37,7 @@ class Prompt:
         # Resolve output file paths
         try:
             self.output_files = [
-                loopflow.io.file.resolve_codebase_path(p, project_dir=self.project_dir, for_reading=False) 
+                codeflow.io.file.resolve_codebase_path(p, project_dir=self.project_dir, for_reading=False) 
                 for p in output_files
             ]
         except ValueError as e:
@@ -48,7 +48,7 @@ class Prompt:
         if context_files:
             try:
                 self.context_files = [
-                    loopflow.io.file.resolve_codebase_path(p, project_dir=self.project_dir, for_reading=True)
+                    codeflow.io.file.resolve_codebase_path(p, project_dir=self.project_dir, for_reading=True)
                     for p in context_files
                 ]
             except ValueError as e:

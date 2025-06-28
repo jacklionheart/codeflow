@@ -3,8 +3,8 @@ from pathlib import Path
 from unittest.mock import AsyncMock, patch
 from typing import Dict, Any
 
-from loopflow.llm.mate import MateConfig, MateError, Team
-from loopflow.llm import LLM
+from codeflow.llm.mate import MateConfig, MateError, Team
+from codeflow.llm import LLM
 from tests.mock import MockProvider
 
 @pytest.fixture

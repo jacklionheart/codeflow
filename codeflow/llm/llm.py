@@ -1,6 +1,6 @@
 # llm.py
 """
-Core abstractions for LLM interactions in loopflow.
+Core abstractions for LLM interactions in codeflow.
 
 This module provides the base interfaces and data structures for working with
 large language models, with each LLM instance representing a single conversation.

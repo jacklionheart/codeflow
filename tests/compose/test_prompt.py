@@ -6,8 +6,8 @@ import pytest
 from pathlib import Path
 from typing import List
 from unittest.mock import patch
-from loopflow.compose.prompt import Prompt, PromptError
-from loopflow.io.file import resolve_codebase_path
+from codeflow.compose.prompt import Prompt, PromptError
+from codeflow.io.file import resolve_codebase_path
 
 @pytest.fixture(autouse=True)
 def set_code_context_root(monkeypatch):
@@ -16,7 +16,7 @@ def set_code_context_root(monkeypatch):
 @pytest.fixture
 def mock_resolve():
     """Provide mocked path resolution with consistent behavior."""
-    with patch('loopflow.io.file.resolve_codebase_path') as mock:
+    with patch('codeflow.io.file.resolve_codebase_path') as mock:
         mock.return_value = Path('/mock/root/path').resolve()
         yield mock
 
@@ -44,7 +44,7 @@ src/lib/
 @pytest.fixture
 def mock_resolve_ok():
     """Provide mocked path resolution with consistent behavior."""
-    with patch('loopflow.io.file.resolve_codebase_path') as mock:
+    with patch('codeflow.io.file.resolve_codebase_path') as mock:
         mock.side_effect = lambda p, **kwargs: (
             p if isinstance(p, Path) and p.is_absolute()
             else Path('/mock/root') / str(p)
@@ -54,7 +54,7 @@ def mock_resolve_ok():
 def test_prompt_path_resolution(mock_resolve_ok):
     """Test path resolution for different input types."""
     prompt = Prompt(
-        path=Path("/mock/root/loopflow.md"),
+        path=Path("/mock/root/codeflow.md"),
         goal="Test goal",
         output_files=["test.py", Path("other/test.py")],
         team=["reviewer"]
@@ -71,11 +71,11 @@ def test_prompt_path_resolution(mock_resolve_ok):
 ])
 def test_prompt_invalid_paths(invalid_input):
     """Test handling of invalid paths."""
-    with patch('loopflow.io.file.resolve_codebase_path') as mock:
+    with patch('codeflow.io.file.resolve_codebase_path') as mock:
         mock.side_effect = ValueError("Invalid path")
         with pytest.raises(PromptError, match="Invalid.*path"):
             Prompt(
-                path=Path("/mock/root/loopflow.md"),
+                path=Path("/mock/root/codeflow.md"),
                 goal="Test goal",
                 output_files=[invalid_input],
                 team=["reviewer"]
@@ -84,7 +84,7 @@ def test_prompt_invalid_paths(invalid_input):
 def test_prompt_team_parsing():
     """Test team member parsing from different formats."""
     prompt = Prompt(
-        path=Path("/mock/root/loopflow.md"),
+        path=Path("/mock/root/codeflow.md"),
         goal="Test goal",
         output_files=["test.py"],
         team=[
@@ -110,6 +110,6 @@ reviewer2
     prompt_file = tmp_path / "test.md"
     prompt_file.write_text(content)
     
-    with patch('loopflow.io.file.resolve_codebase_path'):
+    with patch('codeflow.io.file.resolve_codebase_path'):
         prompt = Prompt.from_file(prompt_file)
         assert set(prompt.team) == {"reviewer1", "reviewer2", "reviewer3"}

@@ -1,7 +1,7 @@
 """
-Git integration for loopflow.
+Git integration for codeflow.
 
-This module provides functionality for auto-checkpointing loopflow operations
+This module provides functionality for auto-checkpointing codeflow operations
 and managing the history of generated files.
 """
 
@@ -12,14 +12,14 @@ import subprocess
 from pathlib import Path
 from typing import Optional, Dict, Any
 
-from loopflow.compose.prompt import Prompt
+from codeflow.compose.prompt import Prompt
 
 
 class GitError(Exception):
     """Exception raised for git-related errors."""
     pass
 
-LOOPFLOW_CHECKPOINT_PREFIX = "[loopflow-checkpoint]"
+CODEFLOW_CHECKPOINT_PREFIX = "[codeflow-checkpoint]"
 
 def is_git_repo(path: Path) -> bool:
     """
@@ -105,11 +105,11 @@ def create_checkpoint(
     details: Optional[Dict[str, Any]] = None
 ) -> bool:
     """
-    Create a loopflow checkpoint commit.
+    Create a codeflow checkpoint commit.
     
     Args:
         path: Directory path for the repository
-        command: The loopflow command that was run
+        command: The codeflow command that was run
         details: Optional details to include in the commit message
         
     Returns:
@@ -118,7 +118,7 @@ def create_checkpoint(
     try:
         logger = logging.getLogger(__name__)
         # Construct commit message
-        commit_message = f"{LOOPFLOW_CHECKPOINT_PREFIX} {command}"
+        commit_message = f"{CODEFLOW_CHECKPOINT_PREFIX} {command}"
         if details:
             # Add relevant details (files processed, etc.)
             detail_str = ", ".join(f"{k}: {v}" for k, v in details.items())
@@ -144,15 +144,15 @@ def create_checkpoint(
         logger.warning(f"Unexpected error creating checkpoint: {e}")
         return False
 
-def find_last_non_loopflow_commit(path: Path) -> Optional[str]:
+def find_last_non_codeflow_commit(path: Path) -> Optional[str]:
     """
-    Find the last git commit that wasn't an auto-generated loopflow checkpoint.
+    Find the last git commit that wasn't an auto-generated codeflow checkpoint.
     
     Args:
         path: Directory path for the repository
         
     Returns:
-        Commit hash of the last non-loopflow commit, or None if not found
+        Commit hash of the last non-codeflow commit, or None if not found
     """
     try:
         logger = logging.getLogger(__name__)
@@ -172,12 +172,12 @@ def find_last_non_loopflow_commit(path: Path) -> Optional[str]:
                 continue
                 
             commit_hash, message = parts
-            if not message.startswith(LOOPFLOW_CHECKPOINT_PREFIX):
+            if not message.startswith(CODEFLOW_CHECKPOINT_PREFIX):
                 return commit_hash
                 
         return None
     except subprocess.CalledProcessError as e:
-        logger.warning(f"Failed to find last non-loopflow commit: {e}")
+        logger.warning(f"Failed to find last non-codeflow commit: {e}")
         return None
     except Exception as e:
         logger.warning(f"Unexpected error finding commit: {e}")
@@ -244,7 +244,7 @@ def should_auto_checkpoint(path: Path) -> bool:
     
     Args:
         path: The project directory
-        config: The loopflow configuration
+        config: The codeflow configuration
         
     Returns:
         True if auto-checkpointing should be enabled
@@ -274,8 +274,8 @@ def auto_checkpoint(
     
     Args:
         path: The project directory
-        command: The loopflow command being run
-        config: The loopflow configuration
+        command: The codeflow command being run
+        config: The codeflow configuration
         details: Optional details for the commit message
         
     Returns:

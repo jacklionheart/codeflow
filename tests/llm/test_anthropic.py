@@ -2,8 +2,8 @@ import pytest
 from unittest.mock import AsyncMock, patch
 import asyncio
 
-from loopflow.llm import LLMError
-from loopflow.llm.anthropic import Anthropic
+from codeflow.llm import LLMError
+from codeflow.llm.anthropic import Anthropic
 
 @pytest.mark.asyncio
 async def test_anthropic_chat(config, mock_response):

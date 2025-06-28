@@ -1,12 +1,12 @@
 import pytest
 import asyncio
 from pathlib import Path
-from loopflow.compose.pipeline import (
+from codeflow.compose.pipeline import (
     ClarifyPipeline, MatePipeline, ReviewPipeline, TeamPipeline
 )
-from loopflow.compose.prompt import Prompt
-from loopflow.io.session import User
-from loopflow.llm.mate import Team
+from codeflow.compose.prompt import Prompt
+from codeflow.io.session import User
+from codeflow.llm.mate import Team
 
 # A minimal dummy session object for pipeline testing.
 class DummySession:
@@ -29,7 +29,7 @@ def dummy_team():
 @pytest.fixture
 def dummy_prompt(tmp_path: Path):
     # Create a temporary prompt file to act as the source.
-    prompt_file = tmp_path / "loopflow.md"
+    prompt_file = tmp_path / "codeflow.md"
     prompt_file.write_text(
         "# Test Prompt\n\n"
         "## Goal\nTest goal\n\n"
@@ -53,7 +53,7 @@ def dummy_session(tmp_path: Path, dummy_team: Team, mock_user):
 # --- ClarifyPipeline Test ---
 @pytest.mark.asyncio
 async def test_clarify_pipeline(dummy_session, dummy_prompt):
-    from loopflow.compose.job import Clarify
+    from codeflow.compose.job import Clarify
     async def dummy_clarify_execute(self, **kwargs):  # note the "self" parameter
         return {"questions": {"mate1": "What is the requirement?"}, "team": dummy_session._dummy_team}
     orig_execute = Clarify.execute
@@ -73,7 +73,7 @@ async def test_clarify_pipeline(dummy_session, dummy_prompt):
 # --- MatePipeline Test ---
 @pytest.mark.asyncio
 async def test_mate_pipeline(dummy_session, dummy_prompt):
-    from loopflow.compose.job import Draft
+    from codeflow.compose.job import Draft
     async def dummy_draft_execute(self, **kwargs):  # add "self"
         output_file = dummy_prompt.output_files[0]
         return {"drafts": {"mate1": {output_file: "dummy draft content"}},
@@ -98,7 +98,7 @@ async def test_review_pipeline(dummy_session, dummy_prompt):
     # Create an output file with some existing content.
     output_file = dummy_prompt.output_files[0]
     output_file.write_text("original content")
-    from loopflow.compose.job import Review
+    from codeflow.compose.job import Review
     async def dummy_review_execute(self, **kwargs):  # add "self"
         return {"reviews": {"mate1": {"user": "dummy review content"}},
                 "team": dummy_session._dummy_team}
@@ -118,7 +118,7 @@ async def test_review_pipeline(dummy_session, dummy_prompt):
 # --- TeamPipeline Test ---
 @pytest.mark.asyncio
 async def test_team_pipeline(dummy_session, dummy_prompt):
-    from loopflow.compose.job import Draft, Review, Synthesize
+    from codeflow.compose.job import Draft, Review, Synthesize
     output_file = dummy_prompt.output_files[0]
     async def dummy_draft_execute(self, **kwargs):  # add "self"
         return {"drafts": {"mate1": {output_file: "draft content"}},
@@ -131,7 +131,7 @@ async def test_team_pipeline(dummy_session, dummy_prompt):
         return {"outputs": {output_file: "final synthesized content"}, "synthesizer": "mate1"}
     orig_draft = Draft.execute
     orig_review = Review.execute
-    from loopflow.compose.job import Synthesize
+    from codeflow.compose.job import Synthesize
     orig_synthesize = Synthesize.execute
     Draft.execute = dummy_draft_execute
     Review.execute = dummy_review_execute
