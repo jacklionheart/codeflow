@@ -18,8 +18,8 @@ dependencies = [
 ]
 
 [project.scripts]
+codeflow-dispatch = "codeflow.cli.codeflow_dispatch:cli"
 codeflow = "codeflow.cli.codeflow:cli"
-code-context = "codeflow.cli.code_context:cli"
 
 [tool.hatch.build.targets.wheel]
 packages = ["codeflow"]
