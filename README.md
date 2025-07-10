@@ -36,9 +36,9 @@ codeflow --flamegraph src
 
 ## Installation
 
-Requires Python 3.11+
+Requires Python 3.11+ and `uv`
 ```bash
-pip install -e .
+uv tool install -e .
 ```
 
 Contact jack@loopflow.studio with any questions. Kinks likely not ironed out.
