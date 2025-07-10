@@ -41,7 +41,7 @@ Requires Python 3.11+
 pip install -e .
 ```
 
-Contact jack@codeflow.studio with any questions. Kinks likely not ironed out.
+Contact jack@loopflow.studio with any questions. Kinks likely not ironed out.
 
 
 ## License
