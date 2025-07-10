@@ -2,7 +2,14 @@
   "permissions": {
     "allow": [
       "Bash(rg:*)",
-      "Bash(mv:*)"
+      "Bash(mv:*)",
+      "Bash(rm:*)",
+      "Bash(python:*)",
+      "Bash(grep:*)",
+      "Bash(uv tool install:*)",
+      "Bash(find:*)",
+      "Bash(uv run pytest:*)",
+      "Bash(uv pip:*)"
     ],
     "deny": []
   }

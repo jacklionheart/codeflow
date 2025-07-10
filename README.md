@@ -1,99 +1,37 @@
 # codeflow
 
-**codeflow** is a workflow system for a graphs of structured llm requests for codegen.
+**codeflow** is a tool for copying a codebase (or parts of it) for use with LLM prompts.
 
 ## How it works
 
-codeflow has two primary interfaces:
-* the *codeflow.md*, which defines the prompt(s) sent to llms by defining *goals*, *output_files*, and other metadata
-* the *codeflow CLI*, which executes commands.
-
-codeflow is built around "mates": LLMs with pre-defined system prompts to act in specific roles (currently: infrastructure engineer, research scientist). Commands can be run either against a specific mate or against a whole "team" of "mates", in which multiple LLMs handle requests and those responses are concatenated.
-
-### Commands
-
-The core codeflow commands:
-- **Clarify**: Ask LLMs to generate questions to clarify the design.
-- **Draft**: Ask LLMs to generate the *output_files*.
-  -  *Single Mate Mode* (faster): One mate directly drafts each file
-  - *Team Mode* (longer): The mates both draft and then review eac others' work, and then one synthesizes the final result
-- **Review**: Asks LLMs to review the current drafts of the output files.
-
-To invoke:
-```bash
-# Initialize a new codeflow project
-codeflow init [project_dir]
-# Generate questions to clarify requirements
-codeflow clarify [project_dir]
-# Draft files (uses full team by default with a draft->review->synthesize subpipeline)
-codeflow draft [project_dir] [--mate <mate_name>]
-# Review existing files and append feedback
-codeflow review [project_dir]
-# Reset git history to before codeflow checkpoints
-codeflow rebase [project_dir]
-```
-
-### Team Members
-
-codeflow is built around the general idea of "mates". Many different mates could be defined for different contexts.
-
-The following two are the defaults currently available:
-- maya: infrastructure engineer at a large tech company, focused on simplicity and robustness
-- merlin: ML researcher specializing in novel architectures and mathematical abstractions
-
-You can add mates in `templates/mates`; simply creating the file is sufficient for it be available.
-
-### Prompt Files
-
-You can create a prompt file template with `codeflow init`. 
-
-They should look like this:
-```markdown
-# Codeflow LLM Implementation
-
-## Goal
-Implement the LLM API for codeflow, a tool for generating code with teams of LLMs.
-
-## Output
-codeflow/llm/llm.py
-codeflow/llm/anthropic.py
-codeflow/tests/test_llm.py
-
-## Context
-codeflow/
-
-## Team
-maya
-merlin
-```
-
-## `code-context`: For providing code context to LLMs Web UI
-
-Key to codeflow is submitting the right context, i.e. subset of the codebase as a reference. This is
-a part of how codeflow works, but installing codeflow also installs a `code-context` binary that is
-used to copy codebase subsets to the clipboard or other output streams.
-
-code-context is a spiritual descendent of [files-to-prompt](https://github.com/simonw/files-to-prompt), 
+codeflow is a spiritual descendant of [files-to-prompt](https://github.com/simonw/files-to-prompt), 
 a tool for specifying and formatting a subset of a codebase to submit as context to an LLM.
 
-code-context builds on files-to-prompt with additional features:
+codeflow builds on files-to-prompt with additional features:
 - Automatic detection and prioritization of parent READMEs
-- Smart path resolution based on common codebase structures
+- Token profiling to understand context window usage
+- Flame graph visualization of token distribution
 
-Perhaps the biggest area of current development is exploring how to best filter and compress large codebases. 
-Right now the burden is on the user to identify the right subset via the code-context tool.
-I believe that empowering the user to quickly express intent is essential, but it is not enough.
-Work in ideas like summarization or indexing or RAG are on-going.
+## Usage
 
 ```bash
-# Copy specific paths to clipboard (OS X):
-code-context -p myproject/src,myproject/tests
+# Copy current directory to clipboard (macOS):
+codeflow -p
 
-# Filter to specific file types
-code-context -e .py -e .js myproject
+# Copy specific paths (space-separated, relative to current directory):
+codeflow src tests
+
+# Filter to specific file types:
+codeflow -e .py -e .js src
 
 # Generate raw output instead of XML-wrapped:
-code-context -r myproject
+codeflow -r src tests
+
+# Profile token usage:
+codeflow --profile src
+
+# Generate interactive flame graph of token distribution:
+codeflow --flamegraph src
 ```
 
 ## Installation
@@ -105,7 +43,6 @@ pip install -e .
 
 Contact jack@codeflow.studio with any questions. Kinks likely not ironed out.
 
-You must set `ANTHROPIC_API_KEY` and/or `OPENAI_API_KEY` in your environment to use those providers.
 
 ## License
 MIT

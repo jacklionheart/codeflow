@@ -34,22 +34,22 @@ def copy_to_clipboard(content: str) -> None:
         click.echo("pbcopy not found - clipboard integration skipped", err=True)
 
 @click.command()
-@click.argument('paths', type=str, default=".")
+@click.argument('paths', nargs=-1, type=str)
 @click.option('-p', '--pbcopy', is_flag=True, help="Copy to clipboard (macOS only)")
 @click.option('-r', '--raw', is_flag=True, help="Output in raw format instead of XML")
 @click.option('-e', '--extension', multiple=True, help="File extensions to include (e.g. -e .py -e .js)")
 @click.option('--profile', is_flag=True, help="Profile token distribution instead of outputting content")
 @click.option('--flamegraph', is_flag=True, help="Generate a flame graph HTML visualization of token distribution")
-def cli(paths: str, pbcopy: bool, raw: bool, extension: Tuple[str, ...], profile: bool, flamegraph: bool) -> None:
+def cli(paths: Tuple[str, ...], pbcopy: bool, raw: bool, extension: Tuple[str, ...], profile: bool, flamegraph: bool) -> None:
     """
     Provide codebase context to LLMs with smart defaults.
-    - PATHS can be comma-separated. Example: "manabot,managym/tests"
+    - PATHS can be space-separated. Example: manabot managym/tests
     """
-    # Split and clean paths
-    path_list = [path.strip() for path in paths.split(',')]
+    # Use provided paths or default to current directory
+    path_list = list(paths) if paths else ['.']
     logger.debug(f"Paths: {path_list}")
 
-    # Load context documents using the default root (~/src)
+    # Load context documents from current directory
     try:
         if profile or flamegraph:
             logger.debug(f"Profiling code context for {path_list}") 

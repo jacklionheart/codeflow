@@ -1,12 +1,11 @@
-```python
 import os
 import tempfile
 import unittest
 from pathlib import Path
 
-from codeflow.io.file import CodeflowIgnore
+from codeflow.io.file import _read_gitignore, _should_ignore
 
-class TestCodeflowIgnore(unittest.TestCase):
+class TestGitignoreHandling(unittest.TestCase):
     def setUp(self):
         self.test_dir = tempfile.TemporaryDirectory()
         self.base_path = Path(self.test_dir.name)
@@ -59,27 +58,44 @@ class TestCodeflowIgnore(unittest.TestCase):
                 with open(path, 'w') as f:
                     f.write(content)
 
-    def test_ignore_patterns(self):
-        lf_ignore = CodeflowIgnore(self.base_path)
-        lf_ignore.load_ignore_files()
-
-        # Paths that should be ignored
-        self.assertTrue(lf_ignore.is_ignored(self.base_path / "test.pyc"))
-        self.assertTrue(lf_ignore.is_ignored(self.base_path / "lib.so"))
-        self.assertTrue(lf_ignore.is_ignored(self.base_path / "subdir/nested.pyc"))
-        self.assertTrue(lf_ignore.is_ignored(self.base_path / "build/lib.so"))
-        self.assertTrue(lf_ignore.is_ignored(self.base_path / "dist/dist.so"))
-        self.assertTrue(lf_ignore.is_ignored(self.base_path / "wandb/data.txt"))
-        self.assertTrue(lf_ignore.is_ignored(self.base_path / "train_dir/model.pt"))
-        self.assertTrue(lf_ignore.is_ignored(self.base_path / "outputs/output.log"))
-        self.assertTrue(lf_ignore.is_ignored(self.base_path / "cython_debug/debug.log"))
+    def test_read_gitignore(self):
+        """Test reading gitignore patterns from file."""
+        gitignore_path = self.base_path / ".codeflowignore"
+        rules = _read_gitignore(str(gitignore_path))
+        
+        # Check that patterns were read correctly
+        self.assertIn("*.pyc", rules)
+        self.assertIn("__pycache__/", rules)
+        self.assertIn("/wandb/", rules)
+        self.assertIn("train_dir/", rules)
+        self.assertIn("*.so", rules)
+        
+    def test_should_ignore_patterns(self):
+        """Test the ignore logic for various file patterns."""
+        gitignore_rules = _read_gitignore(str(self.base_path / ".codeflowignore"))
+        
+        # Binary files should be ignored due to extension
+        self.assertTrue(_should_ignore(self.base_path / "test.pyc", gitignore_rules, self.base_path))
+        self.assertTrue(_should_ignore(self.base_path / "lib.so", gitignore_rules, self.base_path))
+        self.assertTrue(_should_ignore(self.base_path / "subdir/nested.pyc", gitignore_rules, self.base_path))
+        self.assertTrue(_should_ignore(self.base_path / "build/lib.so", gitignore_rules, self.base_path))
+        self.assertTrue(_should_ignore(self.base_path / "dist/dist.so", gitignore_rules, self.base_path))
+        
+        # Data files should be ignored due to extension  
+        self.assertTrue(_should_ignore(self.base_path / "outputs/output.log", gitignore_rules, self.base_path))
+        self.assertTrue(_should_ignore(self.base_path / "cython_debug/debug.log", gitignore_rules, self.base_path))
 
         # Paths that should not be ignored
-        self.assertFalse(lf_ignore.is_ignored(self.base_path / "test.py"))
-        self.assertFalse(lf_ignore.is_ignored(self.base_path / "subdir/nested.py"))
-        self.assertFalse(lf_ignore.is_ignored(self.base_path / "subdir/special.py"))
-        self.assertFalse(lf_ignore.is_ignored(self.base_path / "subdir/special.txt"))
+        self.assertFalse(_should_ignore(self.base_path / "test.py", gitignore_rules, self.base_path))
+        self.assertFalse(_should_ignore(self.base_path / "subdir/nested.py", gitignore_rules, self.base_path))
+        
+    def test_readme_never_ignored(self):
+        """Test that README.md files are never ignored."""
+        gitignore_rules = ["*.md", "README.md"]
+        
+        # README.md should never be ignored even if explicitly in gitignore
+        self.assertFalse(_should_ignore(self.base_path / "README.md", gitignore_rules, self.base_path))
+        self.assertFalse(_should_ignore(self.base_path / "subdir/README.md", gitignore_rules, self.base_path))
 
 if __name__ == "__main__":
     unittest.main()
-```

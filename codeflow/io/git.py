@@ -12,7 +12,6 @@ import subprocess
 from pathlib import Path
 from typing import Optional, Dict, Any
 
-from codeflow.compose.prompt import Prompt
 
 
 class GitError(Exception):
@@ -263,38 +262,3 @@ def should_auto_checkpoint(path: Path) -> bool:
     
     return True
 
-def auto_checkpoint(
-    path: Path, 
-    command: str, 
-    prompt: Prompt
-) -> bool:
-    logger = logging.getLogger(__name__)
-    """
-    Perform an auto-checkpoint if conditions are met.
-    
-    Args:
-        path: The project directory
-        command: The codeflow command being run
-        config: The codeflow configuration
-        details: Optional details for the commit message
-        
-    Returns:
-        True if checkpoint was created or not needed, False if failed
-    """
-    if not should_auto_checkpoint(path):
-        logger.debug("Auto-checkpointing not enabled or applicable")
-        return True
-        
-    # Stage all files
-    if not stage_all_files(path):
-        logger.warning("Failed to stage files for checkpoint")
-        return False
-
-    details = {
-        "path": path,
-        "goal": prompt.goal,
-        "output_files": prompt.output_files
-    }
-
-    # Create the checkpoint
-    return create_checkpoint(path, command, details)

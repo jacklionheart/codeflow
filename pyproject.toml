@@ -5,20 +5,15 @@ build-backend = "hatchling.build"
 [project]
 name = "codeflow"
 version = "0.2.0"
-description = "Orchestrate LLM collaboration for file generation"
+description = "Tool for copying a codebase for use with LLM prompts"
 requires-python = ">=3.11"
 dependencies = [
     "click>=8.0.0",
     "pyyaml>=6.0",
-    "anthropic>=0.18.0",
-    "openai>=1.12.0",
-    "aiohttp>=3.9.0",
     "tiktoken",
-    "pytest-asyncio",
 ]
 
 [project.scripts]
-codeflow-dispatch = "codeflow.cli.codeflow_dispatch:cli"
 codeflow = "codeflow.cli.codeflow:cli"
 
 [tool.hatch.build.targets.wheel]
@@ -29,5 +24,3 @@ asyncio_mode = "auto"
 testpaths = ["tests"]
 asyncio_default_fixture_loop_scope = "function"
 
-[tool.hatch.build.targets.wheel.force-include]
-"codeflow/templates/" = "codeflow/templates"
