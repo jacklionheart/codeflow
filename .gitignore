@@ -1,3 +1,5 @@
+.claude/
+uv.lock
 .DS_Store
 pytest_cache
 *.pyc

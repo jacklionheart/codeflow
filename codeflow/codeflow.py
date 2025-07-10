@@ -8,8 +8,8 @@ import os
 import subprocess
 from pathlib import Path
 from typing import Tuple
-from codeflow.io.file import get_context
-from codeflow.io.token_profiler import profile_code_context, generate_flamegraph
+from codeflow.file import get_context
+from codeflow.token_profiler import profile_code_context, generate_flamegraph
 import click
 import logging
 import tempfile
@@ -22,7 +22,7 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     stream=sys.stderr
 )
-logger = logging.getLogger("codeflow.cli.code_context")
+logger = logging.getLogger("codeflow.code_context")
 
 
 def copy_to_clipboard(content: str) -> None:

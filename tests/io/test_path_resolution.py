@@ -7,7 +7,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from codeflow.io.file import resolve_codebase_path
+from codeflow.file import resolve_codebase_path
 
 
 class TestPathResolution(unittest.TestCase):

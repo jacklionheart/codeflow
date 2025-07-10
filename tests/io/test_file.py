@@ -3,7 +3,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from codeflow.io.file import _read_gitignore, _should_ignore
+from codeflow.file import _read_gitignore, _should_ignore
 
 class TestGitignoreHandling(unittest.TestCase):
     def setUp(self):

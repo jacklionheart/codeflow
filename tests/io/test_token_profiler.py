@@ -8,7 +8,7 @@ from pathlib import Path
 import tempfile
 from unittest.mock import patch, MagicMock
 
-from codeflow.io.token_profiler import TokenProfiler
+from codeflow.token_profiler import TokenProfiler
 
 class TestTokenProfiler(unittest.TestCase):
     """Test cases for the TokenProfiler class."""

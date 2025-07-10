@@ -10,7 +10,7 @@ from pathlib import Path
 from unittest.mock import patch, MagicMock
 from click.testing import CliRunner
 
-from codeflow.cli.codeflow import cli
+from codeflow.codeflow import cli
 
 
 class TestCodeflowCLI(unittest.TestCase):
