@@ -42,31 +42,54 @@ def resolve_codebase_path(path_str: Union[str, Path]) -> Path:
     # All relative paths are resolved against current working directory
     return (Path.cwd() / path_obj).resolve()
 
+def _find_git_root(start_path: Path) -> Optional[Path]:
+    """
+    Find the root of the git repository containing the given path.
+    
+    Args:
+        start_path: Path to start searching from
+    
+    Returns:
+        Path to git root directory, or None if not in a git repo
+    """
+    current = start_path if start_path.is_dir() else start_path.parent
+    
+    # Search up the directory tree for .git directory
+    while current != current.parent:
+        if (current / ".git").is_dir():
+            return current
+        current = current.parent
+    
+    return None
+
 def _find_parent_readmes(path: Path) -> List[Path]:
     """
-    Find all README.md files from given path up to current working directory.
+    Find all README.md files from given path up to git root (or filesystem root).
     
     Args:
         path: Path to start from
     
     Returns:
-        List of README paths
+        List of README paths from deepest to shallowest
     """
     readmes = []
-    current = path
-    root = Path.cwd()
-
-    # Go up the directory tree until we reach the root or can't go higher
-    while current != root and current != current.parent:
+    current = path if path.is_dir() else path.parent
+    
+    # Find the git root to use as our boundary
+    git_root = _find_git_root(current)
+    stop_at = git_root if git_root else Path("/")
+    
+    # Collect READMEs up to the boundary
+    while True:
         readme_path = current / "README.md"
-        if readme_path.exists():
+        if readme_path.exists() and readme_path not in readmes:
             readmes.append(readme_path)
+        
+        # Stop if we've reached our boundary or can't go higher
+        if current == stop_at or current == current.parent:
+            break
+            
         current = current.parent
-
-    # Add root README if it exists
-    root_readme = root / "README.md"
-    if root_readme.exists() and root_readme not in readmes:
-        readmes.append(root_readme)
 
     # Sort by depth and path
     readmes.sort(key=lambda p: (len(p.parts), str(p)))
@@ -295,9 +318,9 @@ def get_context(
                     next_index += 1
 
             # Process requested path
-            gitignore_rules = _read_gitignore(
-                str(path) if path.is_dir() else str(path.parent)
-            )
+            gitignore_dir = path if path.is_dir() else path.parent
+            gitignore_path = gitignore_dir / ".gitignore"
+            gitignore_rules = _read_gitignore(str(gitignore_path))
             new_docs = _collect_files(
                 path,
                 gitignore_rules,
